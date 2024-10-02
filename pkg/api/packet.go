@@ -1,20 +1,30 @@
 package api
 
-import "net"
-
-type PacketType int
-
-const (
-	Hello PacketType = iota
-	Message
+import (
+	"encoding/json"
 )
 
-type IPacketData interface {
-	cts(conn *net.Conn)
-	stc(conn *net.Conn)
+type PacketType int
+type Side int
+
+// const (
+// 	SideServer Side = iota
+// 	SideClient
+// )
+
+type PacketContent map[string]interface{}
+
+type PackData struct {
+	Type    PacketType    `json:"type"`
+	Content PacketContent `json:"content"`
 }
 
-type Packet struct {
-	Type PacketType
-	Data IPacketData
+func (p PackData) Serialize() ([]byte, error) { return json.Marshal(p) }
+func Deserialize(data []byte) (PackData, error) {
+	p := PackData{}
+	return p, json.Unmarshal(data, &p)
+}
+
+type IPacket interface {
+	GetData() PackData
 }
