@@ -15,7 +15,7 @@ endif
 
 build:
 	$(MKDIR)
-	go build -o "$(TARGET_DIR)/$(MOUDLE_NAME)$(SUFFIX)" "$(SRC_DIR)
+	go build -o "$(TARGET_DIR)/$(MOUDLE_NAME)$(SUFFIX)" "$(SRC_DIR)"
 clean:
 	$(RM) "$(TARGET_DIR)/$(BINARY_NAME).exe"
 
