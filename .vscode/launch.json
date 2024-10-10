@@ -9,15 +9,16 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/cmd/server",
-      "args": [":7000"]
+      "program": "${workspaceFolder}/cmd",
+      "args": ["server", ":8080"]
     },
     {
       "name": "Launch Client",
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/cmd/client"
+      "program": "${workspaceFolder}/cmd",
+      "args": ["client", "localhost:8080"]
     }
   ]
 }
