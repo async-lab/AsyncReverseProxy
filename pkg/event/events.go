@@ -1,6 +1,7 @@
 package event
 
 import (
+	"context"
 	"net"
 
 	"club.asynclab/asrp/pkg/logging"
@@ -16,8 +17,9 @@ type EventHello struct {
 }
 
 type EventProxyNegotiate struct {
-	Conn   net.Conn
-	Packet packet.PacketProxyNegotiate
+	Conn    net.Conn
+	ConnCtx context.Context
+	Packet  packet.PacketProxyNegotiate
 }
 
 type EventProxyConfirm struct {

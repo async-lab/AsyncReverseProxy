@@ -1,11 +1,13 @@
 package program
 
 import (
+	"context"
 	"net"
 
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/event"
 	"club.asynclab/asrp/pkg/packet"
+	"club.asynclab/asrp/pkg/pattern"
 	"github.com/google/uuid"
 )
 
@@ -25,50 +27,59 @@ func (server *Server) initEventManager() {
 		}
 
 		if address, ok := server.Sessions.Load(event.Packet.Name); ok {
-			for {
-				frontendListener, err := net.Listen("tcp", address)
-				if err != nil {
-					logger.Error("Error listening frontend on: ", address)
-					return false
-				}
-				defer frontendListener.Close()
+			frontendListener, err := net.Listen("tcp", address)
+			if err != nil {
+				logger.Error("Error listening frontend on: ", address)
+				return true
+			}
+			logger.Info("Started proxy on: ", address)
 
-				logger.Info("Started proxy on: ", address)
-
-				acceptChan := make(chan net.Conn)
-				go func() {
+			go pattern.SelectContextAndChannel(
+				server.Ctx,
+				make(chan net.Conn),
+				func() {},
+				func(conn net.Conn) bool {
+					if conn == nil {
+						return false
+					}
+					id := uuid.NewString()
+					if ok := server.SendPacket(event.Conn, &packet.PacketNewProxyConnection{
+						Name: event.Packet.Name,
+						Uuid: id,
+					}); ok {
+						server.ProxyConnections.Store(id, conn)
+					}
+					return true
+				},
+				func(ch chan net.Conn) {
 					for {
 						frontendConn, err := frontendListener.Accept()
 						if err != nil {
-							if server.Ctx.Err() != nil {
+							if server.Ctx.Err() != nil || event.ConnCtx.Err() != nil {
+								close(ch)
 								return
 							}
 							logger.Error("Error accepting connection: ", err)
 							continue
 						}
-						acceptChan <- frontendConn
+						ch <- frontendConn
 					}
-				}()
-				for {
-					select {
-					case <-server.Ctx.Done():
-						break
-					case conn := <-acceptChan:
-						id := uuid.NewString()
-						if ok := server.SendPacket(event.Conn, &packet.PacketNewProxyConnection{
-							Name: event.Packet.Name,
-							Uuid: id,
-						}); ok {
-							server.ProxyConnections.Store(id, conn)
-						}
-					}
-				}
-			}
+				},
+			)
+
+			go func() {
+				<-event.ConnCtx.Done()
+				server.Sessions.Delete(event.Packet.Name)
+				logger.Info("Stopped proxy on: ", event.Packet.Name)
+				frontendListener.Close()
+			}()
 		}
-		return false
+		return true
 	})
 	event.Subscribe(server.EventManager, func(event event.EventProxy) bool {
 		if conn, ok := server.ProxyConnections.Load(event.Packet.Uuid); ok {
+			defer server.ProxyConnections.Delete(event.Packet.Uuid)
+			defer conn.Close()
 			comm.Proxy(server.Ctx, event.Conn, conn)
 		}
 		return false
@@ -82,43 +93,55 @@ func (server *Server) initEventManager() {
 	})
 }
 
-func (server *Server) emitEvent(conn net.Conn) {
-	for {
-		r, ok := server.ReceivePacket(conn)
-		if !ok {
-			return
-		}
+func (server *Server) emitEvent(conn net.Conn, connCtx context.Context) {
+	pattern.SelectContextAndChannel(
+		server.Ctx,
+		make(chan struct{}),
+		func() {},
+		func(struct{}) bool { return false },
+		func(ch chan struct{}) {
+			for {
+				r, ok := server.ReceivePacket(conn)
+				if !ok {
+					close(ch)
+					return
+				}
 
-		switch r.Type() {
-		case packet.NetPacketTypeHello:
-			ok = event.Publish(server.EventManager, event.EventHello{
-				Conn: conn,
-			})
-		case packet.NetPacketTypeProxyNegotiate:
-			ok = event.Publish(server.EventManager, event.EventProxyNegotiate{
-				Conn:   conn,
-				Packet: *r.(*packet.PacketProxyNegotiate),
-			})
-		case packet.NetPacketTypeProxy:
-			ok = event.Publish(server.EventManager, event.EventProxy{
-				Conn:   conn,
-				Packet: *r.(*packet.PacketProxy),
-			})
-		case packet.NetPacketTypeEnd:
-			ok = event.Publish(server.EventManager, event.EventEnd{})
-		case packet.NetPacketTypeUnknown:
-			ok = event.Publish(server.EventManager, event.EventUnknown{Conn: conn})
-		}
+				switch r.Type() {
+				case packet.NetPacketTypeHello:
+					ok = event.Publish(server.EventManager, event.EventHello{
+						Conn: conn,
+					})
+				case packet.NetPacketTypeProxyNegotiate:
+					ok = event.Publish(server.EventManager, event.EventProxyNegotiate{
+						Conn:    conn,
+						ConnCtx: connCtx,
+						Packet:  *r.(*packet.PacketProxyNegotiate),
+					})
+				case packet.NetPacketTypeProxy:
+					ok = event.Publish(server.EventManager, event.EventProxy{
+						Conn:   conn,
+						Packet: *r.(*packet.PacketProxy),
+					})
+				case packet.NetPacketTypeEnd:
+					ok = event.Publish(server.EventManager, event.EventEnd{})
+				case packet.NetPacketTypeUnknown:
+					ok = event.Publish(server.EventManager, event.EventUnknown{Conn: conn})
+				}
 
-		if !ok {
-			return
-		}
-	}
+				if !ok {
+					close(ch)
+					return
+				}
+			}
+		})
 }
 
 func (server *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
-	server.emitEvent(conn)
+	connCtx, cancel := context.WithCancel(context.Background())
+	server.emitEvent(conn, connCtx)
+	cancel()
 }
 
 func (server *Server) Listen() {
@@ -131,28 +154,30 @@ func (server *Server) Listen() {
 
 	logger.Info("Listening on: ", server.ListenAddress)
 
-	acceptChan := make(chan net.Conn)
-
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				if server.Ctx.Err() != nil {
-					return
-				}
-				logger.Error("Error accepting connection: ", err)
-				continue
+	pattern.SelectContextAndChannel(
+		server.Ctx,
+		make(chan net.Conn),
+		func() {},
+		func(conn net.Conn) bool {
+			if conn == nil {
+				return false
 			}
-			acceptChan <- conn
-		}
-	}()
-
-	for {
-		select {
-		case <-server.Ctx.Done():
-			return
-		case conn := <-acceptChan:
 			go server.handleConnection(conn)
-		}
-	}
+			return true
+		},
+		func(ch chan net.Conn) {
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					if server.Ctx.Err() != nil {
+						close(ch)
+						return
+					}
+					logger.Error("Error accepting connection: ", err)
+					continue
+				}
+				ch <- conn
+			}
+		},
+	)
 }

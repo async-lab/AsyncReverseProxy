@@ -1,12 +1,13 @@
 package program
 
 import (
+	"context"
 	"net"
 
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/event"
 	"club.asynclab/asrp/pkg/packet"
-	"github.com/google/uuid"
+	"club.asynclab/asrp/pkg/pattern"
 )
 
 func (client *Client) initEventManager() {
@@ -28,6 +29,7 @@ func (client *Client) initEventManager() {
 						logger.Error("Error connecting to backend server: ", err)
 						return false
 					}
+					defer backendConn.Close()
 					comm.Proxy(client.Ctx, conn, backendConn)
 				}
 			}
@@ -44,38 +46,48 @@ func (client *Client) initEventManager() {
 	})
 }
 
-func (client *Client) emitEvent(conn net.Conn) {
-	for {
-		r, ok := client.ReceivePacket(conn)
-		if !ok {
-			return
-		}
+func (client *Client) emitEvent(conn net.Conn, connCtx context.Context) {
+	pattern.SelectContextAndChannel(
+		client.Ctx,
+		make(chan struct{}),
+		func() {},
+		func(struct{}) bool { return false },
+		func(ch chan struct{}) {
+			for {
+				r, ok := client.ReceivePacket(conn)
+				if !ok {
+					close(ch)
+					return
+				}
 
-		switch r.Type() {
-		case packet.NetPacketTypeHello:
-			ok = event.Publish(client.EventManager, event.EventHello{
-				Conn: conn,
-			})
-		case packet.NetPacketTypeProxyConfirm:
-			ok = event.Publish(client.EventManager, event.EventProxyConfirm{
-				Conn:   conn,
-				Packet: *r.(*packet.PacketProxyConfirm),
-			})
-		case packet.NetPacketTypeNewProxyConnection:
-			ok = event.Publish(client.EventManager, event.EventNewProxyConnection{
-				Conn:   conn,
-				Packet: *r.(*packet.PacketNewProxyConnection),
-			})
-		case packet.NetPacketTypeEnd:
-			ok = event.Publish(client.EventManager, event.EventEnd{})
-		case packet.NetPacketTypeUnknown:
-			ok = event.Publish(client.EventManager, event.EventUnknown{Conn: conn})
-		}
+				switch r.Type() {
+				case packet.NetPacketTypeHello:
+					ok = event.Publish(client.EventManager, event.EventHello{
+						Conn: conn,
+					})
+				case packet.NetPacketTypeProxyConfirm:
+					ok = event.Publish(client.EventManager, event.EventProxyConfirm{
+						Conn:   conn,
+						Packet: *r.(*packet.PacketProxyConfirm),
+					})
+				case packet.NetPacketTypeNewProxyConnection:
+					ok = event.Publish(client.EventManager, event.EventNewProxyConnection{
+						Conn:   conn,
+						Packet: *r.(*packet.PacketNewProxyConnection),
+					})
+				case packet.NetPacketTypeEnd:
+					ok = event.Publish(client.EventManager, event.EventEnd{})
+				case packet.NetPacketTypeUnknown:
+					ok = event.Publish(client.EventManager, event.EventUnknown{Conn: conn})
+				}
 
-		if !ok {
-			return
-		}
-	}
+				if !ok {
+					close(ch)
+					return
+				}
+			}
+		},
+	)
 }
 
 func (client *Client) consume(consumer func(net.Conn) bool) {
@@ -85,9 +97,11 @@ func (client *Client) consume(consumer func(net.Conn) bool) {
 		return
 	}
 	defer conn.Close()
+	connCtx, cancel := context.WithCancel(context.Background())
 	if ok := consumer(conn); ok {
-		client.emitEvent(conn)
+		client.emitEvent(conn, connCtx)
 	}
+	cancel()
 }
 
 func (client *Client) Hello() {
@@ -96,15 +110,14 @@ func (client *Client) Hello() {
 	})
 }
 
-func (client *Client) StartProxy(frontendAddress string, backendAddress string) {
+func (client *Client) StartProxy(name string, frontendAddress string, backendAddress string) {
 	client.consume(func(conn net.Conn) bool {
-		id := uuid.NewString()
 		ok := client.SendPacket(conn, &packet.PacketProxyNegotiate{
-			Name:            id,
+			Name:            name,
 			FrontendAddress: frontendAddress,
 		})
 		if ok {
-			client.Sessions.Store(id, backendAddress)
+			client.Sessions.Store(name, backendAddress)
 		}
 		return ok
 	})
