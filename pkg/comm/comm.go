@@ -21,7 +21,7 @@ func SendPacket(conn net.Conn, p packet.IPacket) (int, error) {
 }
 
 func ReceivePacket(conn net.Conn) (packet.IPacket, error) {
-	buf := make([]byte, 1024)
+	buf := make([]byte, 32768)
 	n, err := conn.Read(buf)
 	if err != nil {
 		return nil, err
@@ -43,8 +43,8 @@ func CopyData(ctx context.Context, dst io.Writer, src io.Reader) error {
 		func(err error) bool { ret = err; return false },
 		func(ch chan error) {
 			for {
-				_, err := io.Copy(dst, src)
-				if err != nil {
+				n, err := io.Copy(dst, src)
+				if n == 0 || err != nil {
 					if ctx.Err() != nil {
 						ch <- nil
 						return

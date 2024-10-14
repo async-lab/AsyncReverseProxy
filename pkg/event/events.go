@@ -4,13 +4,8 @@ import (
 	"context"
 	"net"
 
-	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/packet"
 )
-
-var logger = logging.GetLogger()
-
-var Manager = NewEventManager()
 
 type EventHello struct {
 	Conn net.Conn

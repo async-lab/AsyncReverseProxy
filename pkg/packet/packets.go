@@ -25,7 +25,8 @@ type PacketProxyNegotiate struct {
 	FrontendAddress string
 }
 type PacketProxyConfirm struct {
-	Name string
+	Name    string
+	Success bool
 }
 type PacketProxy struct {
 	Uuid string

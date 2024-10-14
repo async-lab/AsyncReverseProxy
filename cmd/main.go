@@ -9,6 +9,8 @@ import (
 
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/program"
+	"club.asynclab/asrp/program/client"
+	"club.asynclab/asrp/program/server"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +34,8 @@ func init() {
 				logger.Error("Usage: server <listen_address>")
 				return
 			}
-			server := program.NewServer(ctx, args[0])
+			server := server.NewServer(ctx, args[0])
+			program.Program = server
 			server.Listen()
 		},
 	})
@@ -46,7 +49,8 @@ func init() {
 				logger.Error("Usage: client <remote_address> <name> <frontend_address> <backend_address>")
 				return
 			}
-			client := program.NewClient(ctx, args[0])
+			client := client.NewClient(ctx, args[0])
+			program.Program = client
 			client.Hello()
 			client.StartProxy(args[1], args[2], args[3])
 		},

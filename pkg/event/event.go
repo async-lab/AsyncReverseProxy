@@ -9,21 +9,21 @@ import (
 
 type IEvent interface{}
 type EventHandler[T IEvent] func(event T) bool
-type EventManager struct {
+type EventBus struct {
 	listeners map[reflect.Type][]EventHandler[IEvent]
 }
 
-func NewEventManager() *EventManager {
-	return &EventManager{
+func NewEventBus() *EventBus {
+	return &EventBus{
 		listeners: make(map[reflect.Type][]EventHandler[IEvent]),
 	}
 }
 
-func (e *EventManager) subscribe(tType reflect.Type, handler EventHandler[IEvent]) {
+func (e *EventBus) subscribe(tType reflect.Type, handler EventHandler[IEvent]) {
 	e.listeners[tType] = append(e.listeners[tType], handler)
 }
 
-func (e *EventManager) publish(tType reflect.Type, event IEvent) bool {
+func (e *EventBus) publish(tType reflect.Type, event IEvent) bool {
 	for _, handler := range e.listeners[tType] {
 		if ok := handler(event); !ok {
 			return false
@@ -32,7 +32,7 @@ func (e *EventManager) publish(tType reflect.Type, event IEvent) bool {
 	return true
 }
 
-func Subscribe[T IEvent](eventManager *EventManager, handler EventHandler[T]) {
+func Subscribe[T IEvent](eventManager *EventBus, handler EventHandler[T]) {
 	tType := util.GetStructType((*T)(nil))
 	eventManager.subscribe(tType, func(event IEvent) bool {
 		if event, ok := event.(T); ok {
@@ -44,6 +44,6 @@ func Subscribe[T IEvent](eventManager *EventManager, handler EventHandler[T]) {
 	})
 }
 
-func Publish(eventManager *EventManager, event IEvent) bool {
+func Publish(eventManager *EventBus, event IEvent) bool {
 	return eventManager.publish(util.GetStructType(event), event)
 }
