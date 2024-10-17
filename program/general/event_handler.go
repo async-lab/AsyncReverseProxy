@@ -15,17 +15,17 @@ func EventHandlerHello(event *event.EventReceivedPacket[*packet.PacketHello]) bo
 	return false
 }
 
-func EventHandlerEnd(event event.EventReceivedPacket[*packet.PacketEnd]) bool {
+func EventHandlerPacketEnd(event *event.EventReceivedPacket[*packet.PacketEnd]) bool {
 	return false
 }
 
-func EventHandlerUnknown(event *event.EventReceivedPacket[*packet.PacketUnknown]) bool {
+func EventHandlerPacketUnknown(event *event.EventReceivedPacket[*packet.PacketUnknown]) bool {
 	event.Conn.Write([]byte("Hello, world!"))
 	return false
 }
 
 func AddGeneralEventHandler(bus *event.EventBus) {
 	event.Subscribe(bus, EventHandlerHello)
-	event.Subscribe(bus, EventHandlerEnd)
-	event.Subscribe(bus, EventHandlerUnknown)
+	event.Subscribe(bus, EventHandlerPacketEnd)
+	event.Subscribe(bus, EventHandlerPacketUnknown)
 }
