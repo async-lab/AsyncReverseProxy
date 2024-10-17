@@ -1,11 +1,11 @@
 package util
 
 import (
+	"errors"
 	"io"
-	"os"
-	"syscall"
+	"net"
 )
 
-func IsConnectionClose(err error) bool {
-	return err == io.EOF || err == syscall.ECONNRESET || err == os.ErrClosed
+func IsNetClose(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)
 }

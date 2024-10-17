@@ -7,93 +7,148 @@ import (
 	"club.asynclab/asrp/pkg/event"
 	"club.asynclab/asrp/pkg/packet"
 	"club.asynclab/asrp/pkg/pattern"
+	"club.asynclab/asrp/pkg/structure"
+	"club.asynclab/asrp/pkg/util"
 	"club.asynclab/asrp/program"
 	"github.com/google/uuid"
 )
 
-func EventHandlerProxyNegotiate(event event.EventProxyNegotiate) bool {
-	server, ok := program.Program.(*Server)
-	if !ok {
-		return true
-	}
+func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPacket[*packet.PacketProxyNegotiationRequest]) bool {
+	server := GetServer()
 
-	confirm := func(success bool) bool {
-		return program.SendPacket(event.Conn, &packet.PacketProxyConfirm{
-			Name:    event.Packet.Name,
+	sendResponse := func(success bool) {
+		server.SendPacket(e.Conn, &packet.PacketProxyNegotiationResponse{
+			Name:    e.Packet.Name,
 			Success: success,
 		})
 	}
 
-	frontendListener, err := net.Listen("tcp", event.Packet.FrontendAddress)
-	if err != nil {
-		logger.Error("Error listening frontend on: ", event.Packet.FrontendAddress)
-		return confirm(false)
+	addToProxiesConnections := func() {
+		server.ProxyConnections.Compute(func(s *structure.SyncMap[string, *structure.SyncMap[string, net.Conn]]) {
+			conns, _ := s.LoadOrStore(e.Packet.Name, structure.NewSyncMap[string, net.Conn]())
+			conns.Store(uuid.NewString(), e.Conn)
+		})
 	}
-	logger.Info("Started proxy on: ", event.Packet.FrontendAddress)
 
-	server.Sessions.Store(event.Packet.Name, event.Packet.FrontendAddress)
-	if !confirm(true) {
+	frontendAddress, loaded := server.Sessions.LoadOrStore(e.Packet.Name, e.Packet.FrontendAddress)
+	if loaded {
+		addToProxiesConnections()
+		sendResponse(true)
+		return true
+	}
+
+	listener, err := net.Listen("tcp", frontendAddress)
+	if err != nil {
+		sendResponse(false)
 		return false
 	}
 
-	go pattern.SelectContextAndChannel(
-		server.Meta.Ctx,
-		make(chan net.Conn),
-		func() {},
-		func(conn net.Conn) bool {
-			if conn == nil {
-				return false
-			}
-			id := uuid.NewString()
-			if ok := program.SendPacket(event.Conn, &packet.PacketNewProxyConnection{
-				Name: event.Packet.Name,
-				Uuid: id,
-			}); ok {
-				server.ProxyConnections.Store(id, conn)
-			}
-			return true
-		},
-		func(ch chan net.Conn) {
+	go func() {
+		defer listener.Close()
+		<-server.Ctx.Done()
+	}()
+
+	addToProxiesConnections()
+	sendResponse(true)
+
+	go pattern.NewConfigSelectContextAndChannel[net.Conn]().
+		WithCtx(server.Ctx).
+		WithGoroutine(func(connCh chan net.Conn) {
 			for {
-				frontendConn, err := frontendListener.Accept()
+				conn, err := listener.Accept()
 				if err != nil {
-					if server.Meta.Ctx.Err() != nil || event.ConnCtx.Err() != nil {
-						close(ch)
+					if server.Ctx.Err() != nil || util.IsNetClose(err) {
 						return
 					}
-					logger.Error("Error accepting connection: ", err)
 					continue
 				}
-				ch <- frontendConn
+				connCh <- conn
 			}
-		},
-	)
+		}).
+		WithChannelHandler(func(conn net.Conn) {
+			go pattern.NewConfigSelectContextAndChannel[*packet.PacketProxyData]().
+				WithCtx(server.Ctx).
+				WithGoroutine(func(packetCh chan *packet.PacketProxyData) {
+					defer conn.Close()
+					connUuid := uuid.NewString()
 
+					server.FrontendConnections.Store(connUuid, conn)
+					for {
+						bytes, err := comm.ReadForBytes(conn)
+						if err != nil {
+							if server.Ctx.Err() != nil || util.IsNetClose(err) {
+								return
+							}
+							continue
+						}
+						packetCh <- &packet.PacketProxyData{
+							Name: e.Packet.Name,
+							Uuid: connUuid,
+							Data: bytes,
+						}
+					}
+				}).
+				WithChannelHandler(func(p *packet.PacketProxyData) {
+					go event.Publish(server.EventBus, &event.EventPacketProxyDataQueue{Packet: p})
+				}).
+				Run()
+		}).
+		Run()
+
+	return true
+}
+
+func EventHandlerReceivedPacketProxyConnectionResponse(e *event.EventReceivedPacket[*packet.PacketProxyConnectionResponse]) bool {
+	server := GetServer()
+	print(server)
+	return true
+}
+
+func EventHandlerReceivedPacketProxyData(e *event.EventReceivedPacket[*packet.PacketProxyData]) bool {
+	server, ok := program.Program.(*Server)
+	if !ok {
+		return false
+	}
+	conn, ok := server.FrontendConnections.Load(e.Packet.Uuid)
+	if !ok {
+		return false
+	}
 	go func() {
-		<-event.ConnCtx.Done()
-		server.Sessions.Delete(event.Packet.Name)
-		logger.Info("Stopped proxy on: ", event.Packet.Name)
-		frontendListener.Close()
+		if _, err := conn.Write(e.Packet.Data); err != nil {
+			server.FrontendConnections.Delete(e.Packet.Uuid)
+		}
 	}()
 
 	return true
 }
 
-func EventHandlerProxy(event event.EventProxy) bool {
-	server, ok := program.Program.(*Server)
-	if !ok {
+// TODO: 这里应该改成轮询每个连接
+func EventHandlerPacketProxyDataQueue(e *event.EventPacketProxyDataQueue) bool {
+	server := GetServer()
+
+	conns, loaded := server.ProxyConnections.LoadOrStore(e.Packet.Name, structure.NewSyncMap[string, net.Conn]())
+	if !loaded {
+		return false
+	}
+
+	errConns := make([]string, 0)
+
+	conns.Range(func(key string, value net.Conn) bool {
+		if !server.SendPacket(value, e.Packet) {
+			errConns = append(errConns, key)
+		}
 		return true
+	})
+
+	for _, key := range errConns {
+		conns.Delete(key)
 	}
 
-	if conn, ok := server.ProxyConnections.Load(event.Packet.Uuid); ok {
-		defer server.ProxyConnections.Delete(event.Packet.Uuid)
-		defer conn.Close()
-		comm.Proxy(server.Meta.Ctx, event.Conn, conn)
-	}
-	return false
+	return true
 }
-
 func AddServerEventHandler(bus *event.EventBus) {
-	event.Subscribe(bus, EventHandlerProxyNegotiate)
-	event.Subscribe(bus, EventHandlerProxy)
+	event.Subscribe(bus, EventHandlerReceivedPacketProxyNegotiationRequest)
+	event.Subscribe(bus, EventHandlerReceivedPacketProxyConnectionResponse)
+	event.Subscribe(bus, EventHandlerReceivedPacketProxyData)
+	event.Subscribe(bus, EventHandlerPacketProxyDataQueue)
 }

@@ -1,50 +1,75 @@
 package packet
 
 import (
-	"encoding/json"
 	"reflect"
 
+	"club.asynclab/asrp/pkg/structure"
 	"club.asynclab/asrp/pkg/util"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
-// type Side int
-// const (
-//
-//	SideServer Side = iota
-//	SideClient
-//
+type IPacket interface{}
 
-type IPacket interface {
-	Type() NetPacketType
-}
-type NetPacketType int
 type NetPackData map[string]interface{}
 
-var TypeMap = map[NetPacketType]IPacket{}
-
 type NetPacket struct {
-	Type NetPacketType `json:"type"`
-	Data NetPackData   `json:"data"`
+	Type int
+	Data NetPackData
 }
 
-func (networkPacket NetPacket) Serialize() ([]byte, error) { return json.Marshal(networkPacket) }
-func Deserialize(bytes []byte) (NetPacket, error) {
+//----------------------------------------------------------------------------------------------------
+
+var TypeMap = structure.NewBiMap[int, reflect.Type]()
+
+func RegisterPacketWithKey[T IPacket](key int) {
+	TypeMap.Put(key, util.GetForStructTypeWithType[T]())
+}
+
+func RegisterPacket[T IPacket]() {
+	RegisterPacketWithKey[T](TypeMap.Len())
+}
+
+func GetNetPacketType(p IPacket) int {
+	t, ok := TypeMap.GetKey(util.GetForStructType(p))
+	if !ok {
+		t = 0
+	}
+	return t
+}
+
+//----------------------------------------------------------------------------------------------------
+
+func (netPacket *NetPacket) Serialize() ([]byte, error) { return msgpack.Marshal(netPacket) }
+func Deserialize(bytes []byte) (*NetPacket, error) {
 	netPacket := NetPacket{}
-	return netPacket, json.Unmarshal(bytes, &netPacket)
+	return &netPacket, msgpack.Unmarshal(bytes, &netPacket)
 }
 
-func NewNetPacket(p IPacket) NetPacket {
-	return NetPacket{
-		Type: p.Type(),
+func ToNetPacket(p IPacket) *NetPacket {
+	return &NetPacket{
+		Type: GetNetPacketType(p),
 		Data: util.StructToMap(p),
 	}
 }
 
-func FromNetPacket(netPacket NetPacket) IPacket {
-	if p, ok := TypeMap[netPacket.Type]; ok {
-		c := reflect.New(util.GetStructType(p)).Interface().(IPacket)
-		return util.MapToStruct(netPacket.Data, c)
+func FromNetPacket(netPacket *NetPacket) IPacket {
+	if t, ok := TypeMap.GetValue(netPacket.Type); ok {
+		p := reflect.New(t).Interface().(IPacket)
+		return util.MapToStruct(netPacket.Data, p)
 	}
 
 	return &PacketUnknown{}
+}
+
+//----------------------------------------------------------------------------------------------------
+
+// both
+//
+// 未知
+type PacketUnknown struct {
+	Err error
+}
+
+func init() {
+	RegisterPacketWithKey[PacketUnknown](0)
 }

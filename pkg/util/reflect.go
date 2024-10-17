@@ -1,8 +1,14 @@
 package util
 
-import "reflect"
+import (
+	"reflect"
 
-func GetStructValue(v interface{}) reflect.Value {
+	"club.asynclab/asrp/pkg/logging"
+)
+
+var logger = logging.GetLogger()
+
+func GetForStructValue(v interface{}) reflect.Value {
 	if v == nil {
 		return reflect.Value{}
 	}
@@ -13,10 +19,22 @@ func GetStructValue(v interface{}) reflect.Value {
 	return val
 }
 
-func GetStructType(v interface{}) reflect.Type {
+func GetForStructType(v interface{}) reflect.Type {
 	tType := reflect.TypeOf(v)
 	for tType.Kind() == reflect.Ptr {
 		tType = tType.Elem()
 	}
 	return tType
+}
+
+func GetForPtrType(v interface{}) reflect.Type {
+	return reflect.PtrTo(GetForStructType(v))
+}
+
+func GetForStructTypeWithType[T any]() reflect.Type {
+	return GetForStructType((*T)(nil))
+}
+
+func GetForPtrTypeWithType[T any]() reflect.Type {
+	return reflect.PtrTo(GetForStructTypeWithType[T]())
 }

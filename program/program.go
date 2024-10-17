@@ -16,31 +16,33 @@ var logger = logging.GetLogger()
 
 var Program IProgram = nil
 
-type ProgramMeta struct {
+type MetaProgram struct {
 	Ctx      context.Context
 	EventBus *event.EventBus
 }
 
-type IProgram interface {
-	GetMeta() *ProgramMeta
-}
-
-func NewProgramMeta(ctx context.Context) *ProgramMeta {
-	meta := &ProgramMeta{
+func NewMetaProgram(ctx context.Context) *MetaProgram {
+	meta := &MetaProgram{
 		Ctx:      ctx,
 		EventBus: event.NewEventBus(),
 	}
 	return meta
 }
 
-func ReceivePacket(conn net.Conn) (packet.IPacket, bool) {
+type IProgram interface {
+	Run()
+	ToMeta() *MetaProgram
+	ReceivePacket(conn net.Conn) (packet.IPacket, bool)
+	SendPacket(conn net.Conn, p packet.IPacket) bool
+	EmitEvent(conn net.Conn, connCtx context.Context)
+}
+
+func (meta *MetaProgram) ToMeta() *MetaProgram { return meta }
+
+func (meta *MetaProgram) ReceivePacket(conn net.Conn) (packet.IPacket, bool) {
 	r, err := comm.ReceivePacket(conn)
 	if err != nil {
-		if Program.GetMeta().Ctx.Err() != nil {
-			return nil, false
-		}
-		if util.IsConnectionClose(err) {
-			logger.Error("Connection closed: ", err)
+		if meta.Ctx.Err() != nil || util.IsNetClose(err) {
 			return nil, false
 		}
 		r = &packet.PacketUnknown{Err: err}
@@ -48,7 +50,7 @@ func ReceivePacket(conn net.Conn) (packet.IPacket, bool) {
 	return r, true
 }
 
-func SendPacket(conn net.Conn, p packet.IPacket) bool {
+func (meta *MetaProgram) SendPacket(conn net.Conn, p packet.IPacket) bool {
 	_, error := comm.SendPacket(conn, p)
 	if error != nil {
 		logger.Error("Error sending packet: ", error)
@@ -57,60 +59,41 @@ func SendPacket(conn net.Conn, p packet.IPacket) bool {
 	return true
 }
 
-func EmitEvent(conn net.Conn, connCtx context.Context) {
-	meta := Program.GetMeta()
-	pattern.SelectContextAndChannel(
-		meta.Ctx,
-		make(chan struct{}),
-		func() {},
-		func(struct{}) bool { return false },
-		func(ch chan struct{}) {
+func (meta *MetaProgram) EmitEvent(conn net.Conn, connCtx context.Context) {
+	pattern.NewConfigSelectContextAndChannel[struct{}]().
+		WithCtx(meta.Ctx).
+		WithGoroutine(func(ch chan struct{}) {
 			for {
-				r, ok := ReceivePacket(conn)
+				r, ok := meta.ReceivePacket(conn)
 				if !ok {
-					close(ch)
 					comm.SendPacket(conn, &packet.PacketEnd{})
 					return
 				}
 
-				switch r.Type() {
-				case packet.NetPacketTypeHello:
-					ok = event.Publish(meta.EventBus, event.EventHello{
-						Conn: conn,
-					})
-				case packet.NetPacketTypeProxyNegotiate:
-					ok = event.Publish(meta.EventBus, event.EventProxyNegotiate{
-						Conn:    conn,
-						ConnCtx: connCtx,
-						Packet:  *r.(*packet.PacketProxyNegotiate),
-					})
-				case packet.NetPacketTypeProxy:
-					ok = event.Publish(meta.EventBus, event.EventProxy{
-						Conn:   conn,
-						Packet: *r.(*packet.PacketProxy),
-					})
-				case packet.NetPacketTypeEnd:
-					ok = event.Publish(meta.EventBus, event.EventEnd{})
-				case packet.NetPacketTypeUnknown:
-					ok = event.Publish(meta.EventBus, event.EventUnknown{Conn: conn})
-
-				case packet.NetPacketTypeProxyConfirm:
-					ok = event.Publish(meta.EventBus, event.EventProxyConfirm{
-						Conn:   conn,
-						Packet: *r.(*packet.PacketProxyConfirm),
-					})
-				case packet.NetPacketTypeNewProxyConnection:
-					ok = event.Publish(meta.EventBus, event.EventNewProxyConnection{
-						Conn:   conn,
-						Packet: *r.(*packet.PacketNewProxyConnection),
-					})
+				switch r := r.(type) {
+				case *packet.PacketHello:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketProxyNegotiationRequest:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketProxyNegotiationResponse:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketProxyConnectionRequest:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketProxyConnectionResponse:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketProxyData:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketEnd:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketUnknown:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				}
 
 				if !ok {
-					close(ch)
 					comm.SendPacket(conn, &packet.PacketEnd{})
 					return
 				}
 			}
-		})
+		}).
+		Run()
 }

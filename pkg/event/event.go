@@ -1,11 +1,13 @@
 package event
 
 import (
-	"fmt"
 	"reflect"
 
+	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/util"
 )
+
+var logger = logging.GetLogger()
 
 type IEvent interface{}
 type EventHandler[T IEvent] func(event T) bool
@@ -33,17 +35,17 @@ func (e *EventBus) publish(tType reflect.Type, event IEvent) bool {
 }
 
 func Subscribe[T IEvent](eventManager *EventBus, handler EventHandler[T]) {
-	tType := util.GetStructType((*T)(nil))
+	tType := util.GetForPtrTypeWithType[T]()
 	eventManager.subscribe(tType, func(event IEvent) bool {
 		if event, ok := event.(T); ok {
 			return handler(event)
 		} else {
-			fmt.Printf("Type assertion failed for event type: %s\n", tType)
+			logger.Error("Type assertion failed for event type: ", tType)
 			return false
 		}
 	})
 }
 
 func Publish(eventManager *EventBus, event IEvent) bool {
-	return eventManager.publish(util.GetStructType(event), event)
+	return eventManager.publish(util.GetForPtrType(event), event)
 }

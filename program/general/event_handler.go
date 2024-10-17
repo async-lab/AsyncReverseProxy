@@ -9,17 +9,17 @@ import (
 
 var logger = logging.GetLogger()
 
-func EventHandlerHello(event event.EventHello) bool {
+func EventHandlerHello(event *event.EventReceivedPacket[*packet.PacketHello]) bool {
 	logger.Info("Hello from: ", event.Conn.RemoteAddr())
-	program.SendPacket(event.Conn, &packet.PacketHello{})
+	program.Program.SendPacket(event.Conn, &packet.PacketHello{})
 	return false
 }
 
-func EventHandlerEnd(event event.EventEnd) bool {
+func EventHandlerEnd(event event.EventReceivedPacket[*packet.PacketEnd]) bool {
 	return false
 }
 
-func EventHandlerUnknown(event event.EventUnknown) bool {
+func EventHandlerUnknown(event *event.EventReceivedPacket[*packet.PacketUnknown]) bool {
 	event.Conn.Write([]byte("Hello, world!"))
 	return false
 }

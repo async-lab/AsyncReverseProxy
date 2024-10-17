@@ -4,8 +4,8 @@ import (
 	"context"
 	"net"
 
+	"club.asynclab/asrp/config"
 	"club.asynclab/asrp/pkg/logging"
-	"club.asynclab/asrp/pkg/pattern"
 	"club.asynclab/asrp/pkg/structure"
 	"club.asynclab/asrp/program"
 	"club.asynclab/asrp/program/general"
@@ -14,67 +14,54 @@ import (
 var logger = logging.GetLogger()
 
 type Server struct {
-	Meta             *program.ProgramMeta
-	ListenAddress    string
-	Sessions         *structure.SyncMap[string, string]
-	ProxyConnections *structure.SyncMap[string, net.Conn]
+	program.MetaProgram
+	Config              *config.ConfigServer
+	Sessions            *structure.SyncMap[string, string]                               // name -> frontend_address
+	ProxyConnections    *structure.SyncMap[string, *structure.SyncMap[string, net.Conn]] // name -> conn
+	FrontendConnections *structure.SyncMap[string, net.Conn]                             // uuid -> conn
 }
 
-func (server *Server) GetMeta() *program.ProgramMeta { return server.Meta }
-
-func NewServer(ctx context.Context, listenAddress string) *Server {
+func NewServer(ctx context.Context, config *config.ConfigServer) *Server {
 	server := &Server{
-		Meta:             program.NewProgramMeta(ctx),
-		ListenAddress:    listenAddress,
-		Sessions:         &structure.SyncMap[string, string]{},
-		ProxyConnections: &structure.SyncMap[string, net.Conn]{},
+		MetaProgram:         *program.NewMetaProgram(ctx),
+		Config:              config,
+		Sessions:            structure.NewSyncMap[string, string](),
+		ProxyConnections:    structure.NewSyncMap[string, *structure.SyncMap[string, net.Conn]](),
+		FrontendConnections: structure.NewSyncMap[string, net.Conn](),
 	}
-	general.AddGeneralEventHandler(server.Meta.EventBus)
-	AddServerEventHandler(server.Meta.EventBus)
+	general.AddGeneralEventHandler(server.EventBus)
+	AddServerEventHandler(server.EventBus)
 	return server
 }
 
-func (server *Server) handleConnection(conn net.Conn) {
-	defer conn.Close()
-	connCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	program.EmitEvent(conn, connCtx)
+func GetServer() *Server{
+	server, ok := program.Program.(*Server)
+	if !ok {
+		panic("Program is not a server")
+	}
+	return server
 }
 
-func (server *Server) Listen() {
-	listener, err := net.Listen("tcp", server.ListenAddress)
-	if err != nil {
-		logger.Error("Error listening: ", err)
+func (server *Server) CheckConfig() bool {
+	if server.Config == nil {
+		logger.Error("Config is nil")
+		return false
+	}
+	if server.Config.Server == nil {
+		logger.Error("Server config is nil")
+		return false
+	}
+	return true
+}
+
+func (server *Server) Run() {
+	if !server.CheckConfig() {
 		return
 	}
-	defer listener.Close()
 
-	logger.Info("Listening on: ", server.ListenAddress)
+	logger.Info("Server starting...")
 
-	pattern.SelectContextAndChannel(
-		server.Meta.Ctx,
-		make(chan net.Conn),
-		func() {},
-		func(conn net.Conn) bool {
-			if conn == nil {
-				return false
-			}
-			go server.handleConnection(conn)
-			return true
-		},
-		func(ch chan net.Conn) {
-			for {
-				conn, err := listener.Accept()
-				if err != nil {
-					if server.Meta.Ctx.Err() != nil {
-						close(ch)
-						return
-					}
-					logger.Error("Error accepting connection: ", err)
-					continue
-				}
-				ch <- conn
-			}
-		},
-	)
+	server.Listen()
+
+	<-server.Ctx.Done()
 }

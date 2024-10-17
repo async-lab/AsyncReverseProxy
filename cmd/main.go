@@ -7,10 +7,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	"club.asynclab/asrp/config"
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/program"
 	"club.asynclab/asrp/program/client"
 	"club.asynclab/asrp/program/server"
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 )
 
@@ -31,12 +33,18 @@ func init() {
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				logger.Error("Invalid arguments")
-				logger.Error("Usage: server <listen_address>")
+				logger.Error("Usage: server <config_file>")
 				return
 			}
-			server := server.NewServer(ctx, args[0])
+
+			config := &config.ConfigServer{}
+			if _, err := toml.DecodeFile(args[0], config); err != nil {
+				logger.Error("Error decoding config file: ", err)
+				return
+			}
+			server := server.NewServer(ctx, config)
 			program.Program = server
-			server.Listen()
+			server.Run()
 		},
 	})
 
@@ -44,15 +52,20 @@ func init() {
 		Use:   "client",
 		Short: "Start client",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 4 {
+			if len(args) != 1 {
 				logger.Error("Invalid arguments")
-				logger.Error("Usage: client <remote_address> <name> <frontend_address> <backend_address>")
+				logger.Error("Usage: client <config_file>")
 				return
 			}
-			client := client.NewClient(ctx, args[0])
+
+			config := &config.ConfigClient{}
+			if _, err := toml.DecodeFile(args[0], config); err != nil {
+				logger.Error("Error decoding config file: ", err)
+				return
+			}
+			client := client.NewClient(ctx, config)
 			program.Program = client
-			client.Hello()
-			client.StartProxy(args[1], args[2], args[3])
+			client.Run()
 		},
 	})
 

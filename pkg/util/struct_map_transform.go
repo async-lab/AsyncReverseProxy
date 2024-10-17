@@ -4,7 +4,7 @@ import "reflect"
 
 func StructToMap[T any](v T) map[string]interface{} {
 	result := make(map[string]interface{})
-	val := GetStructValue(v)
+	val := GetForStructValue(v)
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldName := val.Type().Field(i).Name
@@ -16,7 +16,7 @@ func StructToMap[T any](v T) map[string]interface{} {
 }
 
 func MapToStruct[T any](m map[string]interface{}, v T) T {
-	val := GetStructValue(v)
+	val := GetForStructValue(v)
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldName := val.Type().Field(i).Name

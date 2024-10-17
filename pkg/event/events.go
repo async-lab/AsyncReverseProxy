@@ -7,33 +7,16 @@ import (
 	"club.asynclab/asrp/pkg/packet"
 )
 
-type EventHello struct {
-	Conn net.Conn
-}
-
-type EventProxyNegotiate struct {
+type EventReceivedPacket[T packet.IPacket] struct {
 	Conn    net.Conn
 	ConnCtx context.Context
-	Packet  packet.PacketProxyNegotiate
+	Packet  T
 }
 
-type EventProxyConfirm struct {
-	Conn   net.Conn
-	Packet packet.PacketProxyConfirm
+func NewEventReceivedPacket[T packet.IPacket](conn net.Conn, connCtx context.Context, packet T) *EventReceivedPacket[T] {
+	return &EventReceivedPacket[T]{Conn: conn, ConnCtx: connCtx, Packet: packet}
 }
 
-type EventProxy struct {
-	Conn   net.Conn
-	Packet packet.PacketProxy
+type EventPacketProxyDataQueue struct {
+	Packet *packet.PacketProxyData
 }
-
-type EventNewProxyConnection struct {
-	Conn   net.Conn
-	Packet packet.PacketNewProxyConnection
-}
-
-type EventUnknown struct {
-	Conn net.Conn
-}
-
-type EventEnd struct{}
