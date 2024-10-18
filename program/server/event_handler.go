@@ -9,7 +9,6 @@ import (
 	"club.asynclab/asrp/pkg/pattern"
 	"club.asynclab/asrp/pkg/structure"
 	"club.asynclab/asrp/pkg/util"
-	"club.asynclab/asrp/program"
 	"github.com/google/uuid"
 )
 
@@ -23,12 +22,24 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 		})
 	}
 
+	proxyUuid := uuid.NewString()
+
 	addToProxiesConnections := func() {
 		server.ProxyConnections.Compute(func(s *structure.SyncMap[string, *structure.SyncMap[string, net.Conn]]) {
 			conns, _ := s.LoadOrStore(e.Packet.Name, structure.NewSyncMap[string, net.Conn]())
-			conns.Store(uuid.NewString(), e.Conn)
+			conns.Store(proxyUuid, e.Conn)
 		})
 	}
+
+	go func() {
+		defer func() {
+			if conns, ok := server.ProxyConnections.Load(e.Packet.Name); ok {
+				conns.Delete(proxyUuid)
+			}
+		}()
+
+		<-e.ConnCtx.Done()
+	}()
 
 	frontendAddress, loaded := server.Sessions.LoadOrStore(e.Packet.Name, e.Packet.FrontendAddress)
 	if loaded {
@@ -45,7 +56,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 
 	go func() {
 		defer listener.Close()
-		<-server.Ctx.Done()
+		<-e.ConnCtx.Done()
 	}()
 
 	addToProxiesConnections()
@@ -72,7 +83,14 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 					defer conn.Close()
 					connUuid := uuid.NewString()
 
+					if !server.SendPacket(e.Conn, &packet.PacketNewEndConnection{Name: e.Packet.Name, Uuid: connUuid}) {
+						return
+					}
+
 					server.FrontendConnections.Store(connUuid, conn)
+					defer server.FrontendConnections.Delete(connUuid)
+					defer server.SendPacket(e.Conn, &packet.PacketEndConnectionClosed{Uuid: connUuid})
+
 					for {
 						bytes, err := comm.ReadForBytes(conn)
 						if err != nil {
@@ -89,7 +107,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 					}
 				}).
 				WithChannelHandler(func(p *packet.PacketProxyData) {
-					go event.Publish(server.EventBus, &event.EventPacketProxyDataQueue{Packet: p})
+					event.Publish(server.EventBus, &event.EventPacketProxyDataQueue{Packet: p})
 				}).
 				Run()
 		}).
@@ -105,20 +123,23 @@ func EventHandlerReceivedPacketProxyConnectionResponse(e *event.EventReceivedPac
 }
 
 func EventHandlerReceivedPacketProxyData(e *event.EventReceivedPacket[*packet.PacketProxyData]) bool {
-	server, ok := program.Program.(*Server)
-	if !ok {
-		return false
-	}
+	server := GetServer()
 	conn, ok := server.FrontendConnections.Load(e.Packet.Uuid)
 	if !ok {
-		return false
+		return true
 	}
-	go func() {
-		if _, err := conn.Write(e.Packet.Data); err != nil {
-			server.FrontendConnections.Delete(e.Packet.Uuid)
-		}
-	}()
+	if _, err := conn.Write(e.Packet.Data); err != nil {
+		server.FrontendConnections.Delete(e.Packet.Uuid)
+	}
+	return true
+}
 
+func EventHandlerReceivedPacketEndConnectionClosed(e *event.EventReceivedPacket[*packet.PacketEndConnectionClosed]) bool {
+	server := GetServer()
+	if conn, ok := server.FrontendConnections.Load(e.Packet.Uuid); ok {
+		conn.Close()
+	}
+	server.FrontendConnections.Delete(e.Packet.Uuid)
 	return true
 }
 
@@ -144,11 +165,22 @@ func EventHandlerPacketProxyDataQueue(e *event.EventPacketProxyDataQueue) bool {
 		conns.Delete(key)
 	}
 
+	if conns.Len() == 0 {
+		if conn, ok := server.FrontendConnections.Load(e.Packet.Uuid); ok {
+			conn.Close()
+		}
+		server.FrontendConnections.Delete(e.Packet.Uuid)
+		server.ProxyConnections.Delete(e.Packet.Name)
+		server.Sessions.Delete(e.Packet.Name)
+	}
+
 	return true
 }
+
 func AddServerEventHandler(bus *event.EventBus) {
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyNegotiationRequest)
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyConnectionResponse)
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyData)
 	event.Subscribe(bus, EventHandlerPacketProxyDataQueue)
+	event.Subscribe(bus, EventHandlerReceivedPacketEndConnectionClosed)
 }

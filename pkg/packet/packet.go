@@ -53,7 +53,7 @@ func ToNetPacket(p IPacket) *NetPacket {
 }
 
 func FromNetPacket(netPacket *NetPacket) IPacket {
-	if t, ok := TypeMap.GetValue(netPacket.Type); ok {
+	if t, ok := TypeMap.GetValue(netPacket.Type); ok && netPacket.Type != 0 {
 		p := reflect.New(t).Interface().(IPacket)
 		return util.MapToStruct(netPacket.Data, p)
 	}

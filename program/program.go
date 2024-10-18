@@ -51,9 +51,11 @@ func (meta *MetaProgram) ReceivePacket(conn net.Conn) (packet.IPacket, bool) {
 }
 
 func (meta *MetaProgram) SendPacket(conn net.Conn, p packet.IPacket) bool {
-	_, error := comm.SendPacket(conn, p)
-	if error != nil {
-		logger.Error("Error sending packet: ", error)
+	_, err := comm.SendPacket(conn, p)
+	if err != nil {
+		if meta.Ctx.Err() == nil {
+			logger.Error("Error sending packet: ", err)
+		}
 		return false
 	}
 	return true
@@ -66,7 +68,6 @@ func (meta *MetaProgram) EmitEvent(conn net.Conn, connCtx context.Context) {
 			for {
 				r, ok := meta.ReceivePacket(conn)
 				if !ok {
-					comm.SendPacket(conn, &packet.PacketEnd{})
 					return
 				}
 
@@ -83,6 +84,10 @@ func (meta *MetaProgram) EmitEvent(conn net.Conn, connCtx context.Context) {
 					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				case *packet.PacketProxyData:
 					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketNewEndConnection:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				case *packet.PacketEndConnectionClosed:
+					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				case *packet.PacketEnd:
 					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				case *packet.PacketUnknown:
@@ -90,7 +95,6 @@ func (meta *MetaProgram) EmitEvent(conn net.Conn, connCtx context.Context) {
 				}
 
 				if !ok {
-					comm.SendPacket(conn, &packet.PacketEnd{})
 					return
 				}
 			}

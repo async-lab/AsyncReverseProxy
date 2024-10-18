@@ -37,6 +37,21 @@ type PacketProxyConnectionResponse struct {
 	Name string
 }
 
+// s to c
+//
+// 新终端连接
+type PacketNewEndConnection struct {
+	Name string
+	Uuid string
+}
+
+// both
+//
+// 终端连接关闭
+type PacketEndConnectionClosed struct {
+	Uuid string
+}
+
 // both
 //
 // 代理数据包
@@ -49,9 +64,9 @@ type PacketProxyData struct {
 // c to s
 //
 // 心跳
-type PacketHeartbeat struct {
-	Name string
-}
+// type PacketHeartbeat struct {
+// 	Name string
+// }
 
 // both
 //
@@ -64,6 +79,8 @@ func init() {
 	RegisterPacket[PacketProxyNegotiationResponse]()
 	RegisterPacket[PacketProxyConnectionRequest]()
 	RegisterPacket[PacketProxyConnectionResponse]()
+	RegisterPacket[PacketNewEndConnection]()
+	RegisterPacket[PacketEndConnectionClosed]()
 	RegisterPacket[PacketProxyData]()
 	RegisterPacket[PacketEnd]()
 }

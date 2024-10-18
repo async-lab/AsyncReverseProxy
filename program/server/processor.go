@@ -4,12 +4,17 @@ import (
 	"context"
 	"net"
 
+	"club.asynclab/asrp/pkg/comm"
+	"club.asynclab/asrp/pkg/packet"
 	"club.asynclab/asrp/pkg/pattern"
 	"club.asynclab/asrp/pkg/util"
 )
 
 func (server *Server) handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		comm.SendPacket(conn, &packet.PacketEnd{})
+		defer conn.Close()
+	}()
 	connCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	server.EmitEvent(conn, connCtx)

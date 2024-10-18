@@ -87,3 +87,9 @@ func (s *SyncMap[T1, T2]) Range(f func(key T1, value T2) bool) {
 		}
 	}
 }
+
+func (s *SyncMap[T1, T2]) Len() int {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
+	return len(s.m)
+}

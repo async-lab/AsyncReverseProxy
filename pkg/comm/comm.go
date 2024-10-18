@@ -5,11 +5,8 @@ import (
 	"io"
 	"net"
 
-	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/packet"
 )
-
-var logger = logging.GetLogger()
 
 func SendPacket(conn net.Conn, p packet.IPacket) (int, error) {
 	bytes, err := packet.ToNetPacket(p).Serialize()
