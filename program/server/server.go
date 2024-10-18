@@ -34,7 +34,7 @@ func NewServer(ctx context.Context, config *config.ConfigServer) *Server {
 	return server
 }
 
-func GetServer() *Server{
+func GetServer() *Server {
 	server, ok := program.Program.(*Server)
 	if !ok {
 		panic("Program is not a server")

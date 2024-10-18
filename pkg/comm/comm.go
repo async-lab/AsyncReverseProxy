@@ -4,9 +4,17 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"sync"
 
 	"club.asynclab/asrp/pkg/packet"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 32*1024*1024)
+		return &buf
+	},
+}
 
 func SendPacket(conn net.Conn, p packet.IPacket) (int, error) {
 	bytes, err := packet.ToNetPacket(p).Serialize()
@@ -43,10 +51,14 @@ func ReceivePacket(conn net.Conn) (packet.IPacket, error) {
 }
 
 func ReadForBytes(conn net.Conn) ([]byte, error) {
-	buf := make([]byte, 32*1024)
+	bufPtr := bufPool.Get().(*[]byte)
+	buf := *bufPtr
+	defer bufPool.Put(bufPtr)
 	n, err := conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-	return buf[:n], nil
+	res := make([]byte, n)
+	copy(res, buf[:n])
+	return res, nil
 }

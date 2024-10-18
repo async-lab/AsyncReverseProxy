@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 //
 // 函数的返回值决定了是否需要继续触发事件
 func (client *Client) Consume(remoteAddress string, consumer func(net.Conn) bool) {
-	conn, err := net.Dial("tcp", remoteAddress)
+	conn, err := tls.Dial("tcp", remoteAddress, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		logger.Error("Error connecting to remote server: ", err)
 		return

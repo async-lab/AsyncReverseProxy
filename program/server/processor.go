@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 
 	"club.asynclab/asrp/pkg/comm"
@@ -21,7 +22,15 @@ func (server *Server) handleConnection(conn net.Conn) {
 }
 
 func (server *Server) Listen() {
-	listener, err := net.Listen("tcp", server.Config.Server.ListenAddress)
+	cert, err := util.GenerateCert()
+	if err != nil {
+		logger.Error("Error generating cert: ", err)
+		return
+	}
+
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
+
+	listener, err := tls.Listen("tcp", server.Config.Server.ListenAddress, tlsConfig)
 	if err != nil {
 		logger.Error("Error listening: ", err)
 		return
