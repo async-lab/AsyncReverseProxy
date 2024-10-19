@@ -30,7 +30,7 @@ func (client *Client) Consume(remoteAddress string, consumer func(net.Conn) bool
 	connCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if ok := consumer(conn); ok {
-		client.EmitEvent(conn, connCtx)
+		client.EmitEventReceivePacket(conn, connCtx)
 	}
 }
 

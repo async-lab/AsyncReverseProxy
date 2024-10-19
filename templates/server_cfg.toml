@@ -1,0 +1,4 @@
+[server]
+listen_address = "localhost:8080"
+password = "123456"
+token = "qwhrqwh"

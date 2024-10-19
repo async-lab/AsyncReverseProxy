@@ -18,7 +18,7 @@ func (server *Server) handleConnection(conn net.Conn) {
 	}()
 	connCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	server.EmitEvent(conn, connCtx)
+	server.EmitEventReceivePacket(conn, connCtx)
 }
 
 func (server *Server) Listen() {

@@ -1,0 +1,10 @@
+[[remote_servers]]
+name = "server1"
+address = "localhost:8080"
+token = "qwhrqwh"
+
+[[proxies]]
+name = "proxy1"
+remote_server_name = "server1"
+backend_address = "mc.asyncraft.club:25565"
+frontend_address = "localhost:54321"

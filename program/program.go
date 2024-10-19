@@ -34,7 +34,7 @@ type IProgram interface {
 	ToMeta() *MetaProgram
 	ReceivePacket(conn net.Conn) (packet.IPacket, bool)
 	SendPacket(conn net.Conn, p packet.IPacket) bool
-	EmitEvent(conn net.Conn, connCtx context.Context)
+	EmitEventReceivePacket(conn net.Conn, connCtx context.Context)
 }
 
 func (meta *MetaProgram) ToMeta() *MetaProgram { return meta }
@@ -61,7 +61,7 @@ func (meta *MetaProgram) SendPacket(conn net.Conn, p packet.IPacket) bool {
 	return true
 }
 
-func (meta *MetaProgram) EmitEvent(conn net.Conn, connCtx context.Context) {
+func (meta *MetaProgram) EmitEventReceivePacket(conn net.Conn, connCtx context.Context) {
 	pattern.NewConfigSelectContextAndChannel[struct{}]().
 		WithCtx(meta.Ctx).
 		WithGoroutine(func(ch chan struct{}) {
