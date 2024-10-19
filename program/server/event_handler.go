@@ -14,15 +14,20 @@ import (
 
 func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPacket[*packet.PacketProxyNegotiationRequest]) bool {
 	server := GetServer()
+	proxyUuid := uuid.NewString()
 
-	sendResponse := func(success bool) {
+	sendResponse := func(success bool, reason string) {
 		server.SendPacket(e.Conn, &packet.PacketProxyNegotiationResponse{
 			Name:    e.Packet.Name,
 			Success: success,
+			Reason:  reason,
 		})
 	}
 
-	proxyUuid := uuid.NewString()
+	if e.Packet.Token != server.Config.Server.Token {
+		sendResponse(false, "Invalid token")
+		return false
+	}
 
 	addToProxiesConnections := func() {
 		server.ProxyConnections.Compute(func(s *structure.SyncMap[string, *structure.SyncMap[string, net.Conn]]) {
@@ -44,13 +49,13 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 	frontendAddress, loaded := server.Sessions.LoadOrStore(e.Packet.Name, e.Packet.FrontendAddress)
 	if loaded {
 		addToProxiesConnections()
-		sendResponse(true)
+		sendResponse(true, "")
 		return true
 	}
 
 	listener, err := net.Listen("tcp", frontendAddress)
 	if err != nil {
-		sendResponse(false)
+		sendResponse(false, err.Error())
 		return false
 	}
 
@@ -60,7 +65,9 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 	}()
 
 	addToProxiesConnections()
-	sendResponse(true)
+	sendResponse(true, "")
+
+	logger.Info("New proxy [", e.Packet.Name, "] negotiation success")
 
 	go pattern.NewConfigSelectContextAndChannel[net.Conn]().
 		WithCtx(server.Ctx).
@@ -113,12 +120,6 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 		}).
 		Run()
 
-	return true
-}
-
-func EventHandlerReceivedPacketProxyConnectionResponse(e *event.EventReceivedPacket[*packet.PacketProxyConnectionResponse]) bool {
-	server := GetServer()
-	print(server)
 	return true
 }
 
@@ -179,7 +180,6 @@ func EventHandlerPacketProxyDataQueue(e *event.EventPacketProxyDataQueue) bool {
 
 func AddServerEventHandler(bus *event.EventBus) {
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyNegotiationRequest)
-	event.Subscribe(bus, EventHandlerReceivedPacketProxyConnectionResponse)
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyData)
 	event.Subscribe(bus, EventHandlerPacketProxyDataQueue)
 	event.Subscribe(bus, EventHandlerReceivedPacketEndConnectionClosed)

@@ -50,6 +50,7 @@ func (client *Client) StartProxy(remoteServer *config.ConfigItemRemoteServer, na
 				ok := client.SendPacket(conn, &packet.PacketProxyNegotiationRequest{
 					Name:            name,
 					FrontendAddress: frontendAddress,
+					Token:           remoteServer.Token,
 				})
 				if ok {
 					client.Sessions.Store(name, backendAddress)

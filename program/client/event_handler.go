@@ -13,17 +13,14 @@ import (
 func EventHandlerReceivedPacketProxyNegotiationResponse(e *event.EventReceivedPacket[*packet.PacketProxyNegotiationResponse]) bool {
 	client := GetClient()
 
-	if !e.Packet.Success {
+	if e.Packet.Success {
+		logger.Info("Proxy negotiation [", e.Packet.Name, "] success")
+	} else {
+		logger.Error("Proxy negotiation [", e.Packet.Name, "] failed: ", e.Packet.Reason)
 		client.Sessions.Delete(e.Packet.Name)
 	}
 
-	logger.Info("Proxy negotiation ", e.Packet.Name, " response: ", e.Packet.Success)
-
 	return e.Packet.Success
-}
-
-func EventHandlerReceivedPacketProxyConnectionRequest(e *event.EventReceivedPacket[*packet.PacketProxyConnectionRequest]) bool {
-	return true
 }
 
 func EventHandlerReceivedPacketProxyData(e *event.EventReceivedPacket[*packet.PacketProxyData]) bool {
@@ -60,7 +57,7 @@ func EventHandlerReceivedPacketNewEndConnection(e *event.EventReceivedPacket[*pa
 	go pattern.NewConfigSelectContextAndChannel[*packet.PacketProxyData]().
 		WithCtx(client.Ctx).
 		WithGoroutine(func(packetCh chan *packet.PacketProxyData) {
-			defer func(){
+			defer func() {
 				client.SendPacket(e.Conn, &packet.PacketEndConnectionClosed{Uuid: e.Packet.Uuid})
 				conn.Close()
 			}()
@@ -112,7 +109,6 @@ func EventHandlerPacketProxyDataQueue(e *event.EventPacketProxyDataQueue) bool {
 
 func AddClientEventHandler(bus *event.EventBus) {
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyNegotiationResponse)
-	event.Subscribe(bus, EventHandlerReceivedPacketProxyConnectionRequest)
 	event.Subscribe(bus, EventHandlerReceivedPacketProxyData)
 	event.Subscribe(bus, EventHandlerPacketProxyDataQueue)
 	event.Subscribe(bus, EventHandlerReceivedPacketNewEndConnection)

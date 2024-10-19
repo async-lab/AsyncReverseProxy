@@ -3,6 +3,7 @@ package config
 type ConfigItemRemoteServer struct {
 	Name    string `toml:"name"`
 	Address string `toml:"address"`
+	Token string `toml:"token"`
 }
 
 type ConfigItemProxy struct {

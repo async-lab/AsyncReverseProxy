@@ -11,6 +11,7 @@ type PacketHello struct{}
 type PacketProxyNegotiationRequest struct {
 	Name            string
 	FrontendAddress string
+	Token           string
 }
 
 // s to c
@@ -19,22 +20,7 @@ type PacketProxyNegotiationRequest struct {
 type PacketProxyNegotiationResponse struct {
 	Name    string
 	Success bool
-}
-
-// s to c
-//
-// 请求新的代理连接
-type PacketProxyConnectionRequest struct {
-	Name string
-	Uuid string
-	Num  int
-}
-
-// c to s
-//
-// 代理连接标识
-type PacketProxyConnectionResponse struct {
-	Name string
+	Reason  string
 }
 
 // s to c
@@ -77,8 +63,6 @@ func init() {
 	RegisterPacket[PacketHello]()
 	RegisterPacket[PacketProxyNegotiationRequest]()
 	RegisterPacket[PacketProxyNegotiationResponse]()
-	RegisterPacket[PacketProxyConnectionRequest]()
-	RegisterPacket[PacketProxyConnectionResponse]()
 	RegisterPacket[PacketNewEndConnection]()
 	RegisterPacket[PacketEndConnectionClosed]()
 	RegisterPacket[PacketProxyData]()

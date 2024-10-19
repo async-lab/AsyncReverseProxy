@@ -78,10 +78,6 @@ func (meta *MetaProgram) EmitEvent(conn net.Conn, connCtx context.Context) {
 					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				case *packet.PacketProxyNegotiationResponse:
 					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
-				case *packet.PacketProxyConnectionRequest:
-					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
-				case *packet.PacketProxyConnectionResponse:
-					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				case *packet.PacketProxyData:
 					ok = event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
 				case *packet.PacketNewEndConnection:
