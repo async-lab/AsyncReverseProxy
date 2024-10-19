@@ -30,3 +30,6 @@ archives:
 release:
   replace_existing_artifacts: true
   prerelease: auto
+  mode: replace
+checksum:
+  split: true

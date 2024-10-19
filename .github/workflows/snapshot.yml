@@ -31,14 +31,6 @@ jobs:
           VERSION="$(<VERSION)"
           git tag "$VERSION"
 
-      - name: Cache Go modules
-        uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
