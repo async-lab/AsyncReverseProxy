@@ -29,7 +29,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y make upx
           VERSION="$(<VERSION)"
+          git tag -d "$VERSION"
           git tag "$VERSION"
+          git push origin "$VERSION" --force
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
