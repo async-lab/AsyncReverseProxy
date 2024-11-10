@@ -18,7 +18,7 @@ type ProxyConnection struct {
 type LoadBalancer struct {
 	structure.MetaSyncStructure[LoadBalancer]
 	connections  *structure.IndexMap[*ProxyConnection]
-	totalWeights map[int64]int64
+	totalWeights map[int64]int64 // priority -> totalWeight
 	currentIndex int64
 }
 
@@ -47,6 +47,9 @@ func (lb *LoadBalancer) RemoveConn(uuid string) {
 		return
 	}
 	lb.totalWeights[conn.Priority] -= conn.Weight
+	if lb.totalWeights[conn.Priority] == 0 {
+		delete(lb.totalWeights, conn.Priority)
+	}
 	lb.connections.Delete(uuid)
 }
 
