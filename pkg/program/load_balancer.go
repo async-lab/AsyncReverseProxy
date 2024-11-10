@@ -61,11 +61,11 @@ func (lb *LoadBalancer) Next() (uuid string, conn net.Conn, ok bool) {
 		return bigger.Key > smaller.Key
 	})
 
-	if !_ok {
+	if !_ok || totalWeight.Value == 0 {
 		return
 	}
 
-	lb.currentIndex = (lb.currentIndex + 1) % totalWeight.Value
+	lb.currentIndex = (lb.currentIndex + 1) % totalWeight.Value // TODO 这里不知道为什么value有时候会为0，先加个判断
 	i := lb.currentIndex
 
 	lb.connections.Stream().Filter(func(t container.Entry[string, *ProxyConnection]) bool {
