@@ -21,21 +21,21 @@ func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	level := strings.ToUpper(entry.Level.String())
 	message := entry.Message
 
-	show_path := ""
+	showPath := ""
 	_, file, line, ok := runtime.Caller(6)
 	if !ok {
-		show_path = "unknown_file"
+		showPath = "unknown_file"
 		line = 0
 	} else {
 		for i := 0; i < 2; i++ {
-			show_path = file[strings.LastIndex(file, "/"):] + show_path
+			showPath = file[strings.LastIndex(file, "/"):] + showPath
 			file = file[:strings.LastIndex(file, "/")]
 		}
-		show_path = "..." + show_path
+		showPath = "..." + showPath
 	}
 
 	// 构建格式化的日志输出
-	fmt.Fprintf(b, "[%s %s] [%s:%d]: %s\n", now, level, show_path, line, message)
+	fmt.Fprintf(b, "[%s %s] [%s:%d]: %s\n", now, level, showPath, line, message)
 
 	return []byte(b.String()), nil
 }

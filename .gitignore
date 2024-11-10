@@ -4,3 +4,4 @@ __debug_*
 .VSCodeCounter/
 
 dist/
+.idea/

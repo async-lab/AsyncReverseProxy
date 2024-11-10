@@ -7,16 +7,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
-	"io"
 	"math/big"
-	"net"
 	"time"
 )
-
-func IsNetClose(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)
-}
 
 func GenerateSelfSignedCert() (tls.Certificate, error) {
 	// 生成私钥

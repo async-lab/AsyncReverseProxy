@@ -2,12 +2,12 @@ package client
 
 import (
 	"context"
-	"net"
 
 	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/hof"
 	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/structure"
+	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/config"
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/program"
@@ -20,8 +20,8 @@ type Client struct {
 	program.MetaProgram
 	Config             *config.ConfigClient
 	Sessions           *structure.SyncMap[container.Entry[string, string], string] // (name, server) -> backend_address
-	ProxyConnections   *structure.SyncMap[string, net.Conn]                        // uuid -> conn
-	BackendConnections *structure.SyncMap[string, net.Conn]                        // uuid -> conn
+	ProxyConnections   *structure.SyncMap[string, *comm.Conn]                      // uuid -> conn
+	BackendConnections *structure.SyncMap[string, *comm.Conn]                      // uuid -> conn
 }
 
 func NewClient(ctx context.Context, config *config.ConfigClient) *Client {
@@ -29,8 +29,8 @@ func NewClient(ctx context.Context, config *config.ConfigClient) *Client {
 		MetaProgram:        *program.NewMetaProgram(ctx),
 		Config:             config,
 		Sessions:           structure.NewSyncMap[container.Entry[string, string], string](),
-		ProxyConnections:   structure.NewSyncMap[string, net.Conn](),
-		BackendConnections: structure.NewSyncMap[string, net.Conn](),
+		ProxyConnections:   structure.NewSyncMap[string, *comm.Conn](),
+		BackendConnections: structure.NewSyncMap[string, *comm.Conn](),
 	}
 	general.AddGeneralEventHandler(client.EventBus)
 	AddClientEventHandler(client.EventBus)

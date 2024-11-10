@@ -2,14 +2,13 @@ package program
 
 import (
 	"context"
-	"net"
 
+	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/event"
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/packet"
-	"club.asynclab/asrp/pkg/util"
 )
 
 var logger = logging.GetLogger()
@@ -32,17 +31,17 @@ func NewMetaProgram(ctx context.Context) *MetaProgram {
 type IProgram interface {
 	Run()
 	ToMeta() *MetaProgram
-	ReceivePacket(conn net.Conn) (packet.IPacket, bool)
-	SendPacket(conn net.Conn, p packet.IPacket) bool
-	EmitEventReceivePacket(conn net.Conn, connCtx context.Context)
+	ReceivePacket(conn *comm.Conn) (packet.IPacket, bool)
+	SendPacket(conn *comm.Conn, p packet.IPacket) bool
+	EmitEventReceivePacket(conn *comm.Conn)
 }
 
 func (meta *MetaProgram) ToMeta() *MetaProgram { return meta }
 
-func (meta *MetaProgram) ReceivePacket(conn net.Conn) (packet.IPacket, bool) {
+func (meta *MetaProgram) ReceivePacket(conn *comm.Conn) (packet.IPacket, bool) {
 	r, err := comm.ReceivePacket(conn)
 	if err != nil {
-		if meta.Ctx.Err() != nil || util.IsNetClose(err) {
+		if meta.Ctx.Err() != nil || lang.IsNetClose(err) {
 			return nil, false
 		}
 		r = &packet.PacketUnknown{Err: err}
@@ -50,7 +49,7 @@ func (meta *MetaProgram) ReceivePacket(conn net.Conn) (packet.IPacket, bool) {
 	return r, true
 }
 
-func (meta *MetaProgram) SendPacket(conn net.Conn, p packet.IPacket) bool {
+func (meta *MetaProgram) SendPacket(conn *comm.Conn, p packet.IPacket) bool {
 	_, err := comm.SendPacket(conn, p)
 	if err != nil {
 		if meta.Ctx.Err() == nil {
@@ -61,7 +60,7 @@ func (meta *MetaProgram) SendPacket(conn net.Conn, p packet.IPacket) bool {
 	return true
 }
 
-func (meta *MetaProgram) EmitEventReceivePacket(conn net.Conn, connCtx context.Context) {
+func (meta *MetaProgram) EmitEventReceivePacket(conn *comm.Conn) {
 	pattern.NewConfigSelectContextAndChannel[packet.IPacket]().
 		WithCtx(meta.Ctx).
 		WithGoroutine(func(ch chan packet.IPacket) {
@@ -76,21 +75,21 @@ func (meta *MetaProgram) EmitEventReceivePacket(conn net.Conn, connCtx context.C
 		WithChannelHandlerWithInterruption(func(r packet.IPacket) bool {
 			switch r := r.(type) {
 			case *packet.PacketHello:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketProxyNegotiationRequest:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketProxyNegotiationResponse:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketProxyData:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketNewEndSideConnection:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketEndSideConnectionClosed:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketEnd:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			case *packet.PacketUnknown:
-				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, connCtx, r))
+				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			default:
 				logger.Error("Unknown packet type: ", r)
 				return false

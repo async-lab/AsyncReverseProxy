@@ -6,12 +6,13 @@ import (
 	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/hof"
 	"club.asynclab/asrp/pkg/base/structure"
+	"club.asynclab/asrp/pkg/comm"
 )
 
 type ProxyConnection struct {
 	Priority int64
 	Weight   int64
-	Conn     net.Conn
+	Conn     *comm.Conn
 }
 
 type LoadBalancer struct {
@@ -49,7 +50,7 @@ func (lb *LoadBalancer) RemoveConn(uuid string) {
 	lb.connections.Delete(uuid)
 }
 
-func (lb *LoadBalancer) Next() (uuid string, conn net.Conn, ok bool) {
+func (lb *LoadBalancer) Next() (uuid string, conn *comm.Conn, ok bool) {
 	lb.Lock.Lock()
 	defer lb.Lock.Unlock()
 

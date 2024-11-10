@@ -1,24 +1,21 @@
 package server
 
 import (
-	"context"
 	"crypto/tls"
-	"net"
 
+	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/packet"
 	"club.asynclab/asrp/pkg/util"
 )
 
-func (server *Server) handleConnection(conn net.Conn) {
+func (server *Server) handleConnection(conn *comm.Conn) {
 	defer func() {
 		comm.SendPacket(conn, &packet.PacketEnd{})
 		defer conn.Close()
 	}()
-	connCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	server.EmitEventReceivePacket(conn, connCtx)
+	server.EmitEventReceivePacket(conn)
 }
 
 func (server *Server) Listen() {
@@ -41,22 +38,22 @@ func (server *Server) Listen() {
 
 	logger.Info("Listening on: ", server.Config.Server.ListenAddress)
 
-	go pattern.NewConfigSelectContextAndChannel[net.Conn]().
+	go pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
 		WithCtx(server.Ctx).
-		WithGoroutine(func(ch chan net.Conn) {
+		WithGoroutine(func(ch chan *comm.Conn) {
 			for {
 				conn, err := listener.Accept()
 				if err != nil {
-					if server.Ctx.Err() != nil || util.IsNetClose(err) {
+					if server.Ctx.Err() != nil || lang.IsNetClose(err) {
 						return
 					}
 					logger.Error("Error accepting connection: ", err)
 					continue
 				}
-				ch <- conn
+				ch <- comm.NewConn(conn)
 			}
 		}).
-		WithChannelHandler(func(conn net.Conn) {
+		WithChannelHandler(func(conn *comm.Conn) {
 			go server.handleConnection(conn)
 		}).
 		Run()

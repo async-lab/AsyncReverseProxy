@@ -1,30 +1,27 @@
 package event
 
 import (
-	"context"
-	"net"
-
+	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/packet"
 )
 
 type EventReceivedPacket[T packet.IPacket] struct {
-	Conn    net.Conn
-	ConnCtx context.Context
-	Packet  T
+	Conn   *comm.Conn
+	Packet T
 }
 
-func NewEventReceivedPacket[T packet.IPacket](conn net.Conn, connCtx context.Context, packet T) *EventReceivedPacket[T] {
-	return &EventReceivedPacket[T]{Conn: conn, ConnCtx: connCtx, Packet: packet}
+func NewEventReceivedPacket[T packet.IPacket](conn *comm.Conn, packet T) *EventReceivedPacket[T] {
+	return &EventReceivedPacket[T]{Conn: conn, Packet: packet}
 }
 
 type EventPacketProxyDataQueue struct {
 	Packet *packet.PacketProxyData
 
 	// Server独有的字段
-	ProxyConnection net.Conn
+	ProxyConnection comm.Conn
 }
 
 type EventAcceptedFrontendConnection struct {
 	Name string
-	Conn net.Conn
+	Conn *comm.Conn
 }

@@ -4,11 +4,11 @@ import (
 	"net"
 
 	"club.asynclab/asrp/pkg/base/container"
+	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/event"
 	"club.asynclab/asrp/pkg/packet"
-	"club.asynclab/asrp/pkg/util"
 )
 
 func EventHandlerReceivedPacketProxyNegotiationResponse(e *event.EventReceivedPacket[*packet.PacketProxyNegotiationResponse]) bool {
@@ -28,7 +28,7 @@ func EventHandlerReceivedPacketProxyNegotiationResponse(e *event.EventReceivedPa
 
 func EventHandlerReceivedPacketProxyData(e *event.EventReceivedPacket[*packet.PacketProxyData]) bool {
 	client := GetClient()
-	client.ProxyConnections.LoadOrStore(e.Packet.Uuid, e.Conn)
+	client.ProxyConnections.LoadOrStore(e.Packet.Uuid, comm.NewConn(e.Conn))
 
 	conn, loaded := client.BackendConnections.Load(e.Packet.Uuid)
 	if !loaded {
@@ -57,7 +57,7 @@ func EventHandlerReceivedPacketNewEndSideConnection(e *event.EventReceivedPacket
 	if err != nil {
 		return client.SendPacket(e.Conn, &packet.PacketEndSideConnectionClosed{Uuid: e.Packet.Uuid})
 	}
-	client.BackendConnections.Store(e.Packet.Uuid, conn)
+	client.BackendConnections.Store(e.Packet.Uuid,  comm.NewConn(conn))
 	go pattern.NewConfigSelectContextAndChannel[*packet.PacketProxyData]().
 		WithCtx(client.Ctx).
 		WithGoroutine(func(packetCh chan *packet.PacketProxyData) {
@@ -68,7 +68,7 @@ func EventHandlerReceivedPacketNewEndSideConnection(e *event.EventReceivedPacket
 			for {
 				bytes, err := comm.ReadForBytes(conn)
 				if err != nil {
-					if client.Ctx.Err() != nil || util.IsNetClose(err) {
+					if client.Ctx.Err() != nil || lang.IsNetClose(err) {
 						client.ProxyConnections.Delete(e.Packet.Uuid)
 						client.BackendConnections.Delete(e.Packet.Uuid)
 						return

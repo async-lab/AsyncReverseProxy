@@ -3,6 +3,7 @@ package structure
 import (
 	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/hof"
+
 )
 
 type SyncMap[T1 comparable, T2 comparable] struct {

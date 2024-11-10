@@ -4,13 +4,13 @@ import (
 	"net"
 
 	"club.asynclab/asrp/pkg/base/container"
+	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/base/structure"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/event"
 	"club.asynclab/asrp/pkg/packet"
 	"club.asynclab/asrp/pkg/program"
-	"club.asynclab/asrp/pkg/util"
 	"github.com/google/uuid"
 )
 
@@ -61,7 +61,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 					})
 				}
 			}()
-			<-e.ConnCtx.Done()
+			<-e.Conn.Ctx.Done()
 		}()
 	}
 
@@ -93,21 +93,21 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 	addToLoadBalancers()
 	sendResponse(true, "")
 
-	go pattern.NewConfigSelectContextAndChannel[net.Conn]().
+	go pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
 		WithCtx(server.Ctx).
-		WithGoroutine(func(connCh chan net.Conn) {
+		WithGoroutine(func(connCh chan *comm.Conn) {
 			for {
 				conn, err := listener.Accept()
 				if err != nil {
-					if server.Ctx.Err() != nil || util.IsNetClose(err) {
+					if server.Ctx.Err() != nil || lang.IsNetClose(err) {
 						return
 					}
 					continue
 				}
-				connCh <- conn
+				connCh <- comm.NewConn(conn)
 			}
 		}).
-		WithChannelHandler(func(conn net.Conn) {
+		WithChannelHandler(func(conn *comm.Conn) {
 			event.Publish(server.EventBus, &event.EventAcceptedFrontendConnection{
 				Name: e.Packet.Name,
 				Conn: conn,
@@ -139,7 +139,6 @@ func EventHandlerReceivedPacketEndSideConnectionClosed(e *event.EventReceivedPac
 	return true
 }
 
-// TODO：没有写ProxyConn断开的即时情况
 func EventHandlerAcceptedFrontendConnection(e *event.EventAcceptedFrontendConnection) bool {
 	server := GetServer()
 	go pattern.NewConfigSelectContextAndChannel[*packet.PacketProxyData]().
@@ -163,12 +162,17 @@ func EventHandlerAcceptedFrontendConnection(e *event.EventAcceptedFrontendConnec
 
 			server.FrontendConnections.Store(connUuid, *container.NewEntry(e.Conn, proxyConn))
 			defer server.FrontendConnections.Delete(connUuid)
-			defer server.SendPacket(proxyConn, &packet.PacketEndSideConnectionClosed{Uuid: connUuid})
+			defer comm.SendPacket(proxyConn, &packet.PacketEndSideConnectionClosed{Uuid: connUuid})
+
+			go func() {
+				defer e.Conn.Close()
+				<-proxyConn.Ctx.Done()
+			}()
 
 			for {
 				bytes, err := comm.ReadForBytes(e.Conn)
 				if err != nil {
-					if server.Ctx.Err() != nil || util.IsNetClose(err) {
+					if server.Ctx.Err() != nil || lang.IsNetClose(err) {
 						return
 					}
 					continue

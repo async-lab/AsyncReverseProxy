@@ -1,9 +1,7 @@
 package client
 
 import (
-	"context"
 	"crypto/tls"
-	"net"
 	"time"
 
 	"club.asynclab/asrp/pkg/base/container"
@@ -18,7 +16,7 @@ import (
 // 可以传一个需要操作连接的函数，不用关心连接的建立和关闭
 //
 // 函数的返回值决定了是否需要继续触发事件
-func (client *Client) Consume(remoteAddress string, consumer func(net.Conn) bool) {
+func (client *Client) Consume(remoteAddress string, consumer func(*comm.Conn) bool) {
 	conn, err := tls.Dial("tcp", remoteAddress, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		logger.Error("Error connecting to remote server: ", err)
@@ -28,15 +26,14 @@ func (client *Client) Consume(remoteAddress string, consumer func(net.Conn) bool
 		comm.SendPacket(conn, &packet.PacketEnd{})
 		conn.Close()
 	}()
-	connCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	if ok := consumer(conn); ok {
-		client.EmitEventReceivePacket(conn, connCtx)
+	commConn := comm.NewConn(conn)
+	if ok := consumer(commConn); ok {
+		client.EmitEventReceivePacket(commConn)
 	}
 }
 
 func (client *Client) Hello(remoteAddress string) {
-	client.Consume(remoteAddress, func(conn net.Conn) bool {
+	client.Consume(remoteAddress, func(conn *comm.Conn) bool {
 		return client.SendPacket(conn, &packet.PacketHello{})
 	})
 }
@@ -47,7 +44,7 @@ func (client *Client) StartProxy(remoteServer config.ConfigItemRemoteServer, pro
 		case <-client.Ctx.Done():
 			return
 		default:
-			client.Consume(remoteServer.Address, func(conn net.Conn) bool {
+			client.Consume(remoteServer.Address, func(conn *comm.Conn) bool {
 				ok := client.SendPacket(conn, &packet.PacketProxyNegotiationRequest{
 					Name:             proxy.Name,
 					FrontendAddress:  proxy.FrontendAddress,
