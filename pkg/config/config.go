@@ -2,4 +2,4 @@ package config
 
 type IConfig interface{}
 
-var SleepTime = 10
+var SleepTime = 30

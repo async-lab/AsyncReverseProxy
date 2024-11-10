@@ -51,25 +51,29 @@ func (client *Client) StartProxy(remoteServer config.ConfigItemRemoteServer, pro
 					Priority:         proxy.Priority,
 					Weight:           proxy.Weight,
 					Token:            remoteServer.Token,
-					RemoteServerName: proxy.RemoteServerName,
+					RemoteServerName: remoteServer.Name,
 					BackendAddress:   proxy.BackendAddress,
 				})
 				return ok
 			})
 		}
 
-		client.Sessions.Delete(*container.NewEntry(proxy.Name, proxy.RemoteServerName))
+		client.Sessions.Delete(*container.NewEntry(proxy.Name, remoteServer.Name))
 
-		logger.Info("[", proxy.Name, "] -> [", proxy.RemoteServerName, "] closed, retrying in ", config.SleepTime, " seconds...")
+		logger.Info("[", proxy.Name, "] -> [", remoteServer.Name, "] closed, retrying in ", config.SleepTime, " seconds...")
 		time.Sleep(time.Duration(config.SleepTime) * time.Second)
 	}
 }
 
 func (client *Client) StartProxyFromConfig() {
 	for _, proxy := range client.Config.Proxies {
-		remoteServer, _ := hof.NewStreamWithSlice(client.Config.RemoteServers).Filter(func(w container.Wrapper[*config.ConfigItemRemoteServer]) bool {
-			return (*w.Get()).Name == proxy.RemoteServerName
-		}).First()
-		go client.StartProxy(*remoteServer.Get(), *proxy)
+		hof.NewStreamWithSlice(client.Config.RemoteServers).
+			Filter(func(c container.Wrapper[*config.ConfigItemRemoteServer]) bool {
+				return !hof.NewStreamWithSlice(proxy.RemoteServers).
+					Filter(func(w container.Wrapper[string]) bool { return (*c.Get()).Name == w.Get() }).
+					IsEmpty()
+			}).ForEach(func(s container.Wrapper[*config.ConfigItemRemoteServer]) {
+			go client.StartProxy(*s.Get(), *proxy)
+		})
 	}
 }

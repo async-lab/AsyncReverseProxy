@@ -85,6 +85,8 @@ func (s *Stream[T]) Map(f func(T) T) *Stream[T] {
 	return NewStreamWithLockerNotLock(out, s.locker)
 }
 
+//----------------------------------------------------------------------------------------------------
+
 func (s *Stream[T]) ForEach(action func(T)) {
 	defer s.locker.Unlock()
 	for item := range s.source {
@@ -145,4 +147,19 @@ func (s *Stream[T]) Min(comparator func(smaller T, bigger T) bool) (T, bool) {
 		}
 	}
 	return min, ok
+}
+
+func (s *Stream[T]) IsEmpty() bool {
+	defer s.locker.Unlock()
+	_, ok := <-s.source
+	return !ok
+}
+
+func (s *Stream[T]) Len() int {
+	defer s.locker.Unlock()
+	var count int
+	for range s.source {
+		count++
+	}
+	return count
 }

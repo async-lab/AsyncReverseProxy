@@ -5,7 +5,6 @@ import (
 
 	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/hof"
-	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/structure"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/config"
@@ -59,13 +58,22 @@ func (client *Client) CheckConfig() bool {
 		return false
 	}
 	for _, proxy := range client.Config.Proxies {
-		p := client.Config.RemoteServers
-		lang.Useless(p)
-		_, ok := hof.NewStreamWithSlice(client.Config.RemoteServers).Filter(func(c container.Wrapper[*config.ConfigItemRemoteServer]) bool {
-			return (*c.Get()).Name == proxy.RemoteServerName
-		}).First()
+		if len(proxy.RemoteServers) == 0 {
+			logger.Error("[", proxy.Name, "]'s RemoteServers is empty")
+			return false
+		}
+
+		ok := !hof.NewStreamWithSlice(proxy.RemoteServers).
+			Filter(func(w container.Wrapper[string]) bool {
+				ok := !hof.NewStreamWithSlice(client.Config.RemoteServers).
+					Filter(func(c container.Wrapper[*config.ConfigItemRemoteServer]) bool { return (*c.Get()).Name == w.Get() }).
+					IsEmpty()
+				if !ok {
+					logger.Error("RemoteServer not found: ", w.Get())
+				}
+				return ok
+			}).IsEmpty()
 		if !ok {
-			logger.Error("RemoteServer not found: ", proxy.RemoteServerName)
 			return false
 		}
 

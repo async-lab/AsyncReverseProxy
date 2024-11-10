@@ -3,10 +3,28 @@ name = "server1"
 address = "localhost:8080"
 token = "qwhrqwh"
 
+[[remote_servers]]
+name = "server2"
+address = "localhost:8081"
+token = "qwhrqwh"
+
+
 [[proxies]]
 name = "proxy1"
-remote_server_name = "server1"
-backend_address = "mc.asyncraft.club:25565"
+remote_servers = ["server1", "server2"]
+backend_address = "localhost:80"
 frontend_address = "localhost:54321"
-priority = 0                                # bigger is higher priority
+priority = 0                            # bigger is higher priority
 weight = 1
+
+[[proxies]]
+name = "proxy2"
+remote_servers = ["server1"]
+backend_address = "localhost:3000"
+frontend_address = "localhost:54322"
+priority = 0
+weight = 1
+
+
+# You can use the same config for another client, 
+# then you can realize ha and load balancing.
