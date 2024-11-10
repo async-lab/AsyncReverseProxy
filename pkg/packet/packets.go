@@ -9,24 +9,36 @@ type PacketHello struct{}
 //
 // 请求一个新的代理
 type PacketProxyNegotiationRequest struct {
+	// 提交字段
 	Name            string
 	FrontendAddress string
+	Priority        int64
+	Weight          int64
 	Token           string
+
+	// 回显字段
+	RemoteServerName string
+	BackendAddress   string
 }
 
 // s to c
 //
 // 代理请求确认
 type PacketProxyNegotiationResponse struct {
+	// 响应字段
 	Name    string
 	Success bool
 	Reason  string
+
+	// 原回显字段
+	RemoteServerName string
+	BackendAddress   string
 }
 
 // s to c
 //
 // 新终端连接
-type PacketNewEndConnection struct {
+type PacketNewEndSideConnection struct {
 	Name string
 	Uuid string
 }
@@ -34,7 +46,7 @@ type PacketNewEndConnection struct {
 // both
 //
 // 终端连接关闭
-type PacketEndConnectionClosed struct {
+type PacketEndSideConnectionClosed struct {
 	Uuid string
 }
 
@@ -63,8 +75,8 @@ func init() {
 	RegisterPacket[PacketHello]()
 	RegisterPacket[PacketProxyNegotiationRequest]()
 	RegisterPacket[PacketProxyNegotiationResponse]()
-	RegisterPacket[PacketNewEndConnection]()
-	RegisterPacket[PacketEndConnectionClosed]()
+	RegisterPacket[PacketNewEndSideConnection]()
+	RegisterPacket[PacketEndSideConnectionClosed]()
 	RegisterPacket[PacketProxyData]()
 	RegisterPacket[PacketEnd]()
 }

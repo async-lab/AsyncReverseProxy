@@ -17,14 +17,14 @@ var bufPool = sync.Pool{
 }
 
 func SendPacket(conn net.Conn, p packet.IPacket) (int, error) {
-	bytes, err := packet.ToNetPacket(p).Serialize()
+	data, err := packet.ToNetPacket(p).Serialize()
 	if err != nil {
 		return 0, err
 	}
-	length := uint32(len(bytes))
+	length := uint32(len(data))
 	buffer := make([]byte, 4+length)
 	binary.BigEndian.PutUint32(buffer[:4], length)
-	copy(buffer[4:], bytes)
+	copy(buffer[4:], data)
 	return conn.Write(buffer)
 }
 

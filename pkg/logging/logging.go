@@ -13,7 +13,6 @@ type GeneralFormatter struct{}
 
 func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	b := &strings.Builder{}
-
 	if entry.Buffer != nil {
 		b.Write(entry.Buffer.Bytes())
 	}

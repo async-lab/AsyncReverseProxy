@@ -3,8 +3,8 @@ package packet
 import (
 	"reflect"
 
-	"club.asynclab/asrp/pkg/structure"
-	"club.asynclab/asrp/pkg/util"
+	"club.asynclab/asrp/pkg/base/lang"
+	"club.asynclab/asrp/pkg/base/structure"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -22,7 +22,7 @@ type NetPacket struct {
 var TypeMap = structure.NewBiMap[int, reflect.Type]()
 
 func RegisterPacketWithKey[T IPacket](key int) {
-	TypeMap.Put(key, util.GetForStructTypeWithType[T]())
+	TypeMap.Put(key, lang.GetForStructTypeWithType[T]())
 }
 
 func RegisterPacket[T IPacket]() {
@@ -30,7 +30,7 @@ func RegisterPacket[T IPacket]() {
 }
 
 func GetNetPacketType(p IPacket) int {
-	t, ok := TypeMap.GetKey(util.GetForStructType(p))
+	t, ok := TypeMap.GetKey(lang.GetForStructType(p))
 	if !ok {
 		t = 0
 	}
@@ -48,14 +48,14 @@ func Deserialize(bytes []byte) (*NetPacket, error) {
 func ToNetPacket(p IPacket) *NetPacket {
 	return &NetPacket{
 		Type: GetNetPacketType(p),
-		Data: util.StructToMap(p),
+		Data: lang.StructToMap(p),
 	}
 }
 
 func FromNetPacket(netPacket *NetPacket) IPacket {
 	if t, ok := TypeMap.GetValue(netPacket.Type); ok && netPacket.Type != 0 {
 		p := reflect.New(t).Interface().(IPacket)
-		return util.MapToStruct(netPacket.Data, p)
+		return lang.MapToStruct(netPacket.Data, p)
 	}
 
 	return &PacketUnknown{}

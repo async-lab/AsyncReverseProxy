@@ -18,7 +18,7 @@ endif
 build:
 	$(MKDIR)
 	go build -ldflags="-s -w" -o "$(TARGET)" "$(SRC_DIR)"
-	upx --best "$(TARGET)"
+	upx --best --lzma "$(TARGET)"
 clean:
 	$(RM) "$(TARGET)"
 

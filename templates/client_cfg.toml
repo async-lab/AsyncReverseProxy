@@ -8,3 +8,5 @@ name = "proxy1"
 remote_server_name = "server1"
 backend_address = "mc.asyncraft.club:25565"
 frontend_address = "localhost:54321"
+priority = 0                                # bigger is higher priority
+weight = 1

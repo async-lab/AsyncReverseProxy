@@ -19,4 +19,12 @@ func NewEventReceivedPacket[T packet.IPacket](conn net.Conn, connCtx context.Con
 
 type EventPacketProxyDataQueue struct {
 	Packet *packet.PacketProxyData
+
+	// Server独有的字段
+	ProxyConnection net.Conn
+}
+
+type EventAcceptedFrontendConnection struct {
+	Name string
+	Conn net.Conn
 }

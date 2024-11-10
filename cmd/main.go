@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"club.asynclab/asrp/config"
+	"club.asynclab/asrp/pkg/config"
 	"club.asynclab/asrp/pkg/logging"
-	"club.asynclab/asrp/program"
-	"club.asynclab/asrp/program/client"
-	"club.asynclab/asrp/program/server"
+	"club.asynclab/asrp/pkg/program"
+	"club.asynclab/asrp/pkg/program/client"
+	"club.asynclab/asrp/pkg/program/server"
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 )
@@ -28,8 +28,9 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(&cobra.Command{
-		Use:   "server",
-		Short: "Start server",
+		Use:     "server",
+		Aliases: []string{"s"},
+		Short:   "Start server",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				logger.Error("Invalid arguments")
@@ -49,8 +50,9 @@ func init() {
 	})
 
 	rootCmd.AddCommand(&cobra.Command{
-		Use:   "client",
-		Short: "Start client",
+		Use:     "client",
+		Aliases: []string{"c"},
+		Short:   "Start client",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				logger.Error("Invalid arguments")
