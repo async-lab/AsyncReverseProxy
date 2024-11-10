@@ -32,8 +32,6 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 		return false
 	}
 
-	var listener net.Listener
-
 	addToLoadBalancers := func() {
 		lb, _ := server.LoadBalancers.LoadOrStore(e.Packet.Name, program.NewLoadBalancer())
 		proxyUuid := lb.AddConn(&program.ProxyConnection{
@@ -51,8 +49,8 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 						lb.RemoveConn(proxyUuid)
 						logger.Info("[", e.Packet.Name, "] (", lb.Len(), ") connection closed")
 						if lb.Len() == 0 {
-							if listener != nil {
-								listener.Close()
+							if entry, ok := server.Sessions.Load(e.Packet.Name); ok {
+								entry.Value.Close()
 							}
 							server.LoadBalancers.Delete(e.Packet.Name)
 							server.Sessions.Delete(e.Packet.Name)
@@ -67,7 +65,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 
 	skip, isSuccess := false, true
 
-	server.Sessions.Compute(func(s *structure.SyncMap[string, string]) {
+	server.Sessions.Compute(func(s *structure.SyncMap[string, container.Entry[string, net.Listener]]) {
 		if _, ok := server.Sessions.Load(e.Packet.Name); ok {
 			addToLoadBalancers()
 			sendResponse(true, "")
@@ -75,15 +73,14 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 			return
 		}
 
-		_listener, err := net.Listen("tcp", e.Packet.FrontendAddress)
+		listener, err := net.Listen("tcp", e.Packet.FrontendAddress)
 		if err != nil {
 			sendResponse(false, err.Error())
 			skip, isSuccess = true, true
 			return
 		}
 
-		listener = _listener
-		server.Sessions.Store(e.Packet.Name, e.Packet.FrontendAddress)
+		server.Sessions.Store(e.Packet.Name, *container.NewEntry(e.Packet.FrontendAddress, listener))
 	})
 
 	if skip {
@@ -96,6 +93,11 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 	go pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
 		WithCtx(server.Ctx).
 		WithGoroutine(func(connCh chan *comm.Conn) {
+			entry, ok := server.Sessions.Load(e.Packet.Name)
+			if !ok {
+				return
+			}
+			listener := entry.Value
 			for {
 				conn, err := listener.Accept()
 				if err != nil {

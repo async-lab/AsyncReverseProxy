@@ -84,12 +84,12 @@ func (lb *LoadBalancer) Next() (uuid string, conn *comm.Conn, ok bool) {
 }
 
 func (lb *LoadBalancer) ConsumeNext(f func(uuid string, conn net.Conn) bool) (ok bool) {
-	lb.Lock.Lock()
-	defer lb.Lock.Unlock()
-	uuid, conn, ok := lb.Next()
-	if ok {
-		ok = f(uuid, conn)
-	}
+	lb.Compute(func(lb *LoadBalancer) {
+		uuid, conn, _ok := lb.Next()
+		if _ok {
+			ok = f(uuid, conn)
+		}
+	})
 	return ok
 }
 

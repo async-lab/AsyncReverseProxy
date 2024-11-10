@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net"
 
 	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/structure"
@@ -17,7 +18,7 @@ var logger = logging.GetLogger()
 type Server struct {
 	program.MetaProgram
 	Config              *config.ConfigServer
-	Sessions            *structure.SyncMap[string, string]                                  // name -> frontend_address
+	Sessions            *structure.SyncMap[string, container.Entry[string, net.Listener]]   // name -> frontend_address, listener
 	FrontendConnections *structure.SyncMap[string, container.Entry[*comm.Conn, *comm.Conn]] // uuid -> frontConn, proxyConn
 	LoadBalancers       *structure.SyncMap[string, *program.LoadBalancer]                   // name -> lb[proxyConn]
 }
@@ -26,7 +27,7 @@ func NewServer(ctx context.Context, config *config.ConfigServer) *Server {
 	server := &Server{
 		MetaProgram:         *program.NewMetaProgram(ctx),
 		Config:              config,
-		Sessions:            structure.NewSyncMap[string, string](),
+		Sessions:            structure.NewSyncMap[string, container.Entry[string, net.Listener]](),
 		FrontendConnections: structure.NewSyncMap[string, container.Entry[*comm.Conn, *comm.Conn]](),
 		LoadBalancers:       structure.NewSyncMap[string, *program.LoadBalancer](),
 	}
