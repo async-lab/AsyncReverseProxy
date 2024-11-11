@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"club.asynclab/asrp/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,18 +35,24 @@ func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		showPath = "..." + showPath
 	}
 
-	// 构建格式化的日志输出
-	fmt.Fprintf(b, "[%s %s] [%s:%d]: %s\n", now, level, showPath, line, message)
-
+	if config.IsVerbose {
+		fmt.Fprintf(b, "[%s %5s] [%s:%d]: %s\n", now, level, showPath, line, message)
+	} else {
+		fmt.Fprintf(b, "[%s %5s]: %s\n", now, level, message)
+	}
 	return []byte(b.String()), nil
 }
 
 var logger = logrus.New()
 
-func init() {
+func Init() {
 	logger.SetFormatter(&GeneralFormatter{})
 }
 
 func GetLogger() *logrus.Logger {
 	return logger
+}
+
+func init() {
+	Init()
 }

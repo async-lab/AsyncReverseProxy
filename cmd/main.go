@@ -22,54 +22,45 @@ var ctx, cancel = context.WithCancel(context.Background())
 
 var rootCmd = &cobra.Command{
 	Use:   "asrp",
-	Short: "hi!",
-	Long:  `HI!`,
+	Short: "Highly available and scalable reverse proxy",
 }
 
 func init() {
+	rootCmd.PersistentFlags().BoolVarP(&config.IsVerbose, "verbose", "v", false, "verbose output")
+
+	start := func(path string, config config.IConfig, prog program.IProgram) {
+		if _, err := toml.DecodeFile(path, config); err != nil {
+			logger.Error("Error decoding config file: ", err)
+			return
+		}
+
+		program.Program = prog
+		prog.Run()
+	}
+
 	rootCmd.AddCommand(&cobra.Command{
-		Use:     "server",
+		Use:     "server config_file",
 		Aliases: []string{"s"},
 		Short:   "Start server",
+		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				logger.Error("Invalid arguments")
-				logger.Error("Usage: server <config_file>")
-				return
-			}
-
-			config := &config.ConfigServer{}
-			if _, err := toml.DecodeFile(args[0], config); err != nil {
-				logger.Error("Error decoding config file: ", err)
-				return
-			}
-			server := server.NewServer(ctx, config)
-			program.Program = server
-			server.Run()
+			start(args[0], &config.ConfigServer{}, server.NewServer(ctx, &config.ConfigServer{}))
 		},
 	})
 
 	rootCmd.AddCommand(&cobra.Command{
-		Use:     "client",
+		Use:     "client config_file",
 		Aliases: []string{"c"},
 		Short:   "Start client",
+		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				logger.Error("Invalid arguments")
-				logger.Error("Usage: client <config_file>")
-				return
-			}
-
-			config := &config.ConfigClient{}
-			if _, err := toml.DecodeFile(args[0], config); err != nil {
-				logger.Error("Error decoding config file: ", err)
-				return
-			}
-			client := client.NewClient(ctx, config)
-			program.Program = client
-			client.Run()
+			start(args[0], &config.ConfigClient{}, client.NewClient(ctx, &config.ConfigClient{}))
 		},
 	})
+
+	if config.IsVerbose {
+		logging.Init()
+	}
 
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
