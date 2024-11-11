@@ -44,7 +44,8 @@ func init() {
 		Short:   "Start server",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			start(args[0], &config.ConfigServer{}, server.NewServer(ctx, &config.ConfigServer{}))
+			cfg := &config.ConfigServer{}
+			start(args[0], cfg, server.NewServer(ctx, cfg))
 		},
 	})
 
@@ -54,7 +55,8 @@ func init() {
 		Short:   "Start client",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			start(args[0], &config.ConfigClient{}, client.NewClient(ctx, &config.ConfigClient{}))
+			cfg := &config.ConfigClient{}
+			start(args[0], cfg, client.NewClient(ctx, cfg))
 		},
 	})
 
