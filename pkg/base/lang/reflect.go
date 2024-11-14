@@ -4,33 +4,45 @@ import (
 	"reflect"
 )
 
-func GetForStructValue(v interface{}) reflect.Value {
+func GetForActualValue(v interface{}) reflect.Value {
 	if v == nil {
 		return reflect.Value{}
 	}
 	val := reflect.ValueOf(v)
-	for val.Kind() == reflect.Ptr {
-		val = val.Elem()
+	for {
+		switch val.Kind() {
+		case reflect.Ptr:
+			val = val.Elem()
+		case reflect.Interface:
+			val = val.Elem()
+		default:
+			return val
+		}
 	}
-	return val
 }
 
-func GetForStructType(v interface{}) reflect.Type {
+func GetForActualType(v interface{}) reflect.Type {
 	tType := reflect.TypeOf(v)
-	for tType.Kind() == reflect.Ptr {
-		tType = tType.Elem()
+	for {
+		switch tType.Kind() {
+		case reflect.Ptr:
+			tType = tType.Elem()
+		case reflect.Interface:
+			tType = tType.Elem()
+		default:
+			return tType
+		}
 	}
-	return tType
 }
 
 func GetForPtrType(v interface{}) reflect.Type {
-	return reflect.PtrTo(GetForStructType(v))
+	return reflect.PtrTo(GetForActualType(v))
 }
 
-func GetForStructTypeWithType[T any]() reflect.Type {
-	return GetForStructType((*T)(nil))
+func GetForActualTypeWithType[T any]() reflect.Type {
+	return GetForActualType((*T)(nil))
 }
 
 func GetForPtrTypeWithType[T any]() reflect.Type {
-	return reflect.PtrTo(GetForStructTypeWithType[T]())
+	return reflect.PtrTo(GetForActualTypeWithType[T]())
 }

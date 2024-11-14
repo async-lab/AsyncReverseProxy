@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"fmt"
 	"reflect"
 
 	"club.asynclab/asrp/pkg/base/lang"
@@ -22,7 +23,7 @@ type NetPacket struct {
 var TypeMap = structure.NewBiMap[int, reflect.Type]()
 
 func RegisterPacketWithKey[T IPacket](key int) {
-	TypeMap.Put(key, lang.GetForStructTypeWithType[T]())
+	TypeMap.Put(key, lang.GetForActualTypeWithType[T]())
 }
 
 func RegisterPacket[T IPacket]() {
@@ -30,7 +31,7 @@ func RegisterPacket[T IPacket]() {
 }
 
 func GetNetPacketType(p IPacket) int {
-	t, ok := TypeMap.GetKey(lang.GetForStructType(p))
+	t, ok := TypeMap.GetKey(lang.GetForActualType(p))
 	if !ok {
 		t = 0
 	}
@@ -55,10 +56,13 @@ func ToNetPacket(p IPacket) *NetPacket {
 func FromNetPacket(netPacket *NetPacket) IPacket {
 	if t, ok := TypeMap.GetValue(netPacket.Type); ok && netPacket.Type != 0 {
 		p := reflect.New(t).Interface().(IPacket)
-		return lang.MapToStruct(netPacket.Data, p)
+		if err := lang.MapToStruct(netPacket.Data, &p); err != nil {
+			return &PacketUnknown{Err: err}
+		}
+		return p
 	}
 
-	return &PacketUnknown{}
+	return &PacketUnknown{Err: fmt.Errorf("unknown packet type: %d", netPacket.Type)}
 }
 
 //----------------------------------------------------------------------------------------------------

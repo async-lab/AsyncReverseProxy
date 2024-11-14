@@ -28,7 +28,7 @@ func EventHandlerReceivedPacketProxyNegotiationResponse(e *event.EventReceivedPa
 
 func EventHandlerReceivedPacketProxyData(e *event.EventReceivedPacket[*packet.PacketProxyData]) bool {
 	client := GetClient()
-	client.ProxyConnections.LoadOrStore(e.Packet.Uuid, comm.NewConn(e.Conn))
+	client.ProxyConnections.LoadOrStore(e.Packet.Uuid, e.Conn)
 
 	conn, loaded := client.BackendConnections.Load(e.Packet.Uuid)
 	if !loaded {
@@ -57,7 +57,7 @@ func EventHandlerReceivedPacketNewEndSideConnection(e *event.EventReceivedPacket
 	if err != nil {
 		return client.SendPacket(e.Conn, &packet.PacketEndSideConnectionClosed{Uuid: e.Packet.Uuid})
 	}
-	client.BackendConnections.Store(e.Packet.Uuid,  comm.NewConn(conn))
+	client.BackendConnections.Store(e.Packet.Uuid, comm.NewConnWithParentCtx(client.Ctx, conn))
 	go pattern.NewConfigSelectContextAndChannel[*packet.PacketProxyData]().
 		WithCtx(client.Ctx).
 		WithGoroutine(func(packetCh chan *packet.PacketProxyData) {

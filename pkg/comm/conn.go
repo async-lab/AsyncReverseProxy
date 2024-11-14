@@ -3,21 +3,48 @@ package comm
 import (
 	"context"
 	"net"
-	"time"
 
 	"club.asynclab/asrp/pkg/base/lang"
 )
 
 type Conn struct {
-	Conn      net.Conn
+	net.Conn
 	Ctx       context.Context
 	CtxCancel context.CancelFunc
 	Closed    bool
 }
 
+func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
+	if parentCtx == nil {
+		panic("parentCtx is nil")
+	}
+
+	ctx, cancel := context.WithCancel(parentCtx)
+	ret := &Conn{
+		Conn:      conn,
+		Ctx:       ctx,
+		CtxCancel: cancel,
+		Closed:    false,
+	}
+	go func() {
+		defer ret.Close()
+		switch conn := conn.(type) {
+		case *Conn:
+			select {
+			case <-conn.Ctx.Done():
+				break
+			case <-ctx.Done():
+				break
+			}
+		default:
+			<-ctx.Done()
+		}
+	}()
+	return ret
+}
+
 func NewConn(conn net.Conn) *Conn {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &Conn{Conn: conn, Ctx: ctx, CtxCancel: cancel}
+	return NewConnWithParentCtx(context.Background(), conn)
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
@@ -42,24 +69,4 @@ func (c *Conn) Close() error {
 		c.Closed = true
 	}()
 	return c.Conn.Close()
-}
-
-func (c *Conn) LocalAddr() net.Addr {
-	return c.Conn.LocalAddr()
-}
-
-func (c *Conn) RemoteAddr() net.Addr {
-	return c.Conn.RemoteAddr()
-}
-
-func (c *Conn) SetDeadline(t time.Time) error {
-	return c.Conn.SetDeadline(t)
-}
-
-func (c *Conn) SetReadDeadline(t time.Time) error {
-	return c.Conn.SetReadDeadline(t)
-}
-
-func (c *Conn) SetWriteDeadline(t time.Time) error {
-	return c.Conn.SetWriteDeadline(t)
 }

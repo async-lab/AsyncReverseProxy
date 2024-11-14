@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"club.asynclab/asrp/pkg/base/container"
-	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/base/structure"
 	"club.asynclab/asrp/pkg/comm"
@@ -65,7 +64,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 
 	skip, isSuccess := false, true
 
-	server.Sessions.Compute(func(s *structure.SyncMap[string, container.Entry[string, net.Listener]]) {
+	server.Sessions.Compute(func(s *structure.SyncMap[string, container.Entry[string, *comm.Listener]]) {
 		if _, ok := server.Sessions.Load(e.Packet.Name); ok {
 			addToLoadBalancers()
 			sendResponse(true, "")
@@ -80,7 +79,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 			return
 		}
 
-		server.Sessions.Store(e.Packet.Name, *container.NewEntry(e.Packet.FrontendAddress, listener))
+		server.Sessions.Store(e.Packet.Name, *container.NewEntry(e.Packet.FrontendAddress, comm.NewListenerWithParentCtx(server.Ctx, listener)))
 	})
 
 	if skip {
@@ -101,12 +100,12 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 			for {
 				conn, err := listener.Accept()
 				if err != nil {
-					if server.Ctx.Err() != nil || lang.IsNetClose(err) {
+					if listener.Ctx.Err() != nil {
 						return
 					}
 					continue
 				}
-				connCh <- comm.NewConn(conn)
+				connCh <- comm.NewConnWithParentCtx(server.Ctx, conn)
 			}
 		}).
 		WithChannelHandler(func(conn *comm.Conn) {
@@ -162,19 +161,16 @@ func EventHandlerAcceptedFrontendConnection(e *event.EventAcceptedFrontendConnec
 				return
 			}
 
+			e.Conn = comm.NewConnWithParentCtx(proxyConn.Ctx, e.Conn)
+
 			server.FrontendConnections.Store(connUuid, *container.NewEntry(e.Conn, proxyConn))
 			defer server.FrontendConnections.Delete(connUuid)
 			defer comm.SendPacket(proxyConn, &packet.PacketEndSideConnectionClosed{Uuid: connUuid})
 
-			go func() {
-				defer e.Conn.Close()
-				<-proxyConn.Ctx.Done()
-			}()
-
 			for {
 				bytes, err := comm.ReadForBytes(e.Conn)
 				if err != nil {
-					if server.Ctx.Err() != nil || lang.IsNetClose(err) {
+					if e.Conn.Ctx.Err() != nil {
 						return
 					}
 					continue

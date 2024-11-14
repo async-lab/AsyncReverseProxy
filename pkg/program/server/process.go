@@ -3,7 +3,6 @@ package server
 import (
 	"crypto/tls"
 
-	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/packet"
@@ -25,16 +24,13 @@ func (server *Server) Listen() {
 		return
 	}
 
-	listener, err := tls.Listen("tcp", server.Config.Server.ListenAddress, &tls.Config{Certificates: []tls.Certificate{cert}})
+	_listener, err := tls.Listen("tcp", server.Config.Server.ListenAddress, &tls.Config{Certificates: []tls.Certificate{cert}})
 	if err != nil {
 		logger.Error("Error listening: ", err)
 		return
 	}
 
-	go func() {
-		defer listener.Close()
-		<-server.Ctx.Done()
-	}()
+	listener := comm.NewListenerWithParentCtx(server.Ctx, _listener)
 
 	logger.Info("Listening on: ", server.Config.Server.ListenAddress)
 
@@ -44,13 +40,13 @@ func (server *Server) Listen() {
 			for {
 				conn, err := listener.Accept()
 				if err != nil {
-					if server.Ctx.Err() != nil || lang.IsNetClose(err) {
+					if listener.Ctx.Err() != nil {
 						return
 					}
 					logger.Error("Error accepting connection: ", err)
 					continue
 				}
-				ch <- comm.NewConn(conn)
+				ch <- comm.NewConnWithParentCtx(server.Ctx, conn)
 			}
 		}).
 		WithChannelHandler(func(conn *comm.Conn) {

@@ -26,7 +26,7 @@ func (client *Client) Consume(remoteAddress string, consumer func(*comm.Conn) bo
 		comm.SendPacket(conn, &packet.PacketEnd{})
 		conn.Close()
 	}()
-	commConn := comm.NewConn(conn)
+	commConn := comm.NewConnWithParentCtx(client.Ctx, conn)
 	if ok := consumer(commConn); ok {
 		client.EmitEventReceivePacket(commConn)
 	}

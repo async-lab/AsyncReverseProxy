@@ -1,10 +1,13 @@
 package lang
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
-func StructToMap[T any](v T) map[string]interface{} {
+func StructToMap(v any) map[string]interface{} {
 	result := make(map[string]interface{})
-	val := GetForStructValue(v)
+	val := GetForActualValue(v)
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldName := val.Type().Field(i).Name
@@ -15,14 +18,17 @@ func StructToMap[T any](v T) map[string]interface{} {
 	return result
 }
 
-func MapToStruct[T any](m map[string]interface{}, v T) T {
-	val := GetForStructValue(v)
+func MapToStruct[T any](m map[string]interface{}, v *T) error {
+	val := GetForActualValue(v)
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldName := val.Type().Field(i).Name
-		fieldValue := m[fieldName]
+		fieldValue, ok := m[fieldName]
+		if !ok {
+			return fmt.Errorf("field %s not found", fieldName)
+		}
 		val.Field(i).Set(reflect.ValueOf(fieldValue))
 	}
 
-	return v
+	return nil
 }
