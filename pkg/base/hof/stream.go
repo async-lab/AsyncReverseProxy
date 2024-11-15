@@ -94,10 +94,10 @@ func (s *Stream[T]) ForEach(action func(T)) {
 	}
 }
 
-func (s *Stream[T]) Range(f func(T) bool) {
+func (s *Stream[T]) Range(action func(T) bool) {
 	defer s.locker.Unlock()
 	for item := range s.source {
-		if !f(item) {
+		if !action(item) {
 			break
 		}
 	}

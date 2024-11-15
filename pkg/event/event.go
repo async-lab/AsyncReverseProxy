@@ -21,8 +21,8 @@ func NewEventBus() *EventBus {
 	}
 }
 
-func (b *EventBus) subscribe(t reflect.Type, handler EventHandler[IEvent]) {
-	b.listeners[t] = append(b.listeners[t], handler)
+func (b *EventBus) subscribe(t reflect.Type, h EventHandler[IEvent]) {
+	b.listeners[t] = append(b.listeners[t], h)
 }
 
 func (b *EventBus) publish(t reflect.Type, e IEvent) bool {
@@ -34,11 +34,11 @@ func (b *EventBus) publish(t reflect.Type, e IEvent) bool {
 	return true
 }
 
-func Subscribe[T IEvent](eventManager *EventBus, handler EventHandler[T]) {
+func Subscribe[T IEvent](b *EventBus, h EventHandler[T]) {
 	t := lang.GetActualTypeWithGeneric[T]()
-	eventManager.subscribe(t, func(event IEvent) bool {
-		if event, ok := event.(T); ok {
-			return handler(event)
+	b.subscribe(t, func(e IEvent) bool {
+		if e, ok := e.(T); ok {
+			return h(e)
 		} else {
 			logger.Error("Type assertion failed for event type: ", t)
 			return false
@@ -46,6 +46,6 @@ func Subscribe[T IEvent](eventManager *EventBus, handler EventHandler[T]) {
 	})
 }
 
-func Publish(eventManager *EventBus, e IEvent) bool {
-	return eventManager.publish(lang.GetActualType(e), e)
+func Publish(b *EventBus, e IEvent) bool {
+	return b.publish(lang.GetActualType(e), e)
 }
