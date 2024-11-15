@@ -23,7 +23,7 @@ type NetPacket struct {
 var TypeMap = structure.NewBiMap[int, reflect.Type]()
 
 func RegisterPacketWithKey[T IPacket](key int) {
-	TypeMap.Put(key, lang.GetForActualTypeWithType[T]())
+	TypeMap.Put(key, lang.GetActualTypeWithGeneric[T]())
 }
 
 func RegisterPacket[T IPacket]() {
@@ -31,7 +31,7 @@ func RegisterPacket[T IPacket]() {
 }
 
 func GetNetPacketType(p IPacket) int {
-	t, ok := TypeMap.GetKey(lang.GetForActualType(p))
+	t, ok := TypeMap.GetKey(lang.GetActualType(p))
 	if !ok {
 		t = 0
 	}

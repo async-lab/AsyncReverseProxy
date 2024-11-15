@@ -4,7 +4,7 @@ import (
 	"reflect"
 )
 
-func GetForActualValue(v interface{}) reflect.Value {
+func GetActualValue(v interface{}) reflect.Value {
 	if v == nil {
 		return reflect.Value{}
 	}
@@ -21,7 +21,7 @@ func GetForActualValue(v interface{}) reflect.Value {
 	}
 }
 
-func GetForActualType(v interface{}) reflect.Type {
+func GetActualType(v interface{}) reflect.Type {
 	tType := reflect.TypeOf(v)
 	for {
 		switch tType.Kind() {
@@ -35,14 +35,24 @@ func GetForActualType(v interface{}) reflect.Type {
 	}
 }
 
-func GetForPtrType(v interface{}) reflect.Type {
-	return reflect.PtrTo(GetForActualType(v))
+func GetActualPtrType(v interface{}) reflect.Type {
+	return reflect.PtrTo(GetActualType(v))
 }
 
-func GetForActualTypeWithType[T any]() reflect.Type {
-	return GetForActualType((*T)(nil))
+func GetActualTypeWithGeneric[T any]() reflect.Type {
+	return GetActualType((*T)(nil))
 }
 
-func GetForPtrTypeWithType[T any]() reflect.Type {
-	return reflect.PtrTo(GetForActualTypeWithType[T]())
+func GetActualPtrTypeWithGeneric[T any]() reflect.Type {
+	return reflect.PtrTo(GetActualTypeWithGeneric[T]())
+}
+
+type FQN string
+
+func (fqn FQN) String() string {
+	return string(fqn)
+}
+
+func GetFQN(t reflect.Type) FQN {
+	return FQN(t.PkgPath() + "." + t.Name())
 }

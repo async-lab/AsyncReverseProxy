@@ -35,7 +35,7 @@ func (e *EventBus) publish(tType reflect.Type, event IEvent) bool {
 }
 
 func Subscribe[T IEvent](eventManager *EventBus, handler EventHandler[T]) {
-	tType := lang.GetForPtrTypeWithType[T]()
+	tType := lang.GetActualTypeWithGeneric[T]()
 	eventManager.subscribe(tType, func(event IEvent) bool {
 		if event, ok := event.(T); ok {
 			return handler(event)
@@ -47,5 +47,5 @@ func Subscribe[T IEvent](eventManager *EventBus, handler EventHandler[T]) {
 }
 
 func Publish(eventManager *EventBus, event IEvent) bool {
-	return eventManager.publish(lang.GetForPtrType(event), event)
+	return eventManager.publish(lang.GetActualType(event), event)
 }

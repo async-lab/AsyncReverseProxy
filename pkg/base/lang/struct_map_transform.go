@@ -7,7 +7,7 @@ import (
 
 func StructToMap(v any) map[string]interface{} {
 	result := make(map[string]interface{})
-	val := GetForActualValue(v)
+	val := GetActualValue(v)
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldName := val.Type().Field(i).Name
@@ -19,7 +19,7 @@ func StructToMap(v any) map[string]interface{} {
 }
 
 func MapToStruct[T any](m map[string]interface{}, v *T) error {
-	val := GetForActualValue(v)
+	val := GetActualValue(v)
 
 	for i := 0; i < val.Type().NumField(); i++ {
 		fieldName := val.Type().Field(i).Name

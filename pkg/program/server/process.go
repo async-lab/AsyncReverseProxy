@@ -11,8 +11,8 @@ import (
 
 func (server *Server) handleConnection(conn *comm.Conn) {
 	defer func() {
-		comm.SendPacket(conn, &packet.PacketEnd{})
 		defer conn.Close()
+		comm.SendPacket(conn, &packet.PacketEnd{})
 	}()
 	server.EmitEventReceivePacket(conn)
 }

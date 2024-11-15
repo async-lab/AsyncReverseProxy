@@ -3,7 +3,6 @@ package program
 import (
 	"context"
 
-	"club.asynclab/asrp/pkg/base/lang"
 	"club.asynclab/asrp/pkg/base/pattern"
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/event"
@@ -12,8 +11,6 @@ import (
 )
 
 var logger = logging.GetLogger()
-
-var Program IProgram = nil
 
 type MetaProgram struct {
 	Ctx      context.Context
@@ -41,7 +38,7 @@ func (meta *MetaProgram) ToMeta() *MetaProgram { return meta }
 func (meta *MetaProgram) ReceivePacket(conn *comm.Conn) (packet.IPacket, bool) {
 	r, err := comm.ReceivePacket(conn)
 	if err != nil {
-		if meta.Ctx.Err() != nil || lang.IsNetClose(err) {
+		if conn.Ctx.Err() != nil {
 			return nil, false
 		}
 		r = &packet.PacketUnknown{Err: err}
@@ -52,10 +49,10 @@ func (meta *MetaProgram) ReceivePacket(conn *comm.Conn) (packet.IPacket, bool) {
 func (meta *MetaProgram) SendPacket(conn *comm.Conn, p packet.IPacket) bool {
 	_, err := comm.SendPacket(conn, p)
 	if err != nil {
-		if meta.Ctx.Err() == nil {
-			logger.Error("Error sending packet: ", err)
+		if conn.Ctx.Err() != nil {
+			return false
 		}
-		return false
+		logger.Error("Error sending packet: ", err)
 	}
 	return true
 }
@@ -91,9 +88,11 @@ func (meta *MetaProgram) EmitEventReceivePacket(conn *comm.Conn) {
 			case *packet.PacketUnknown:
 				return event.Publish(meta.EventBus, event.NewEventReceivedPacket(conn, r))
 			default:
-				logger.Error("Unknown packet type: ", r)
+				logger.Error("Unknown packet type for unknown error: ", r)
 				return false
 			}
 		}).
 		Run()
 }
+
+var Program IProgram = nil
