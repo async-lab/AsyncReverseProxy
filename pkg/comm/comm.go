@@ -12,7 +12,7 @@ import (
 var bufSize = 4 + 128*1024
 var reserved = 1024 // 读取时为头部和序列化预留的长度
 
-var bufPool = sync.Pool{
+var bufPool = &sync.Pool{
 	New: func() interface{} {
 		buf := make([]byte, bufSize)
 		return &buf
