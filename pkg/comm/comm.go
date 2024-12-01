@@ -9,11 +9,12 @@ import (
 	"club.asynclab/asrp/pkg/packet"
 )
 
+var bufSize = 4 + 128*1024
 var reserved = 1024 // 读取时为头部和序列化预留的长度
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		buf := make([]byte, 4+128*1024)
+		buf := make([]byte, bufSize)
 		return &buf
 	},
 }
@@ -28,6 +29,10 @@ func SendPacket(conn net.Conn, p packet.IPacket) (int, error) {
 	buf := *bufPtr
 
 	length := uint32(len(data))
+	if int(length) > bufSize {
+		return 0, io.ErrShortBuffer
+	}
+
 	buf = buf[:4+length]
 	binary.BigEndian.PutUint32(buf[:4], length)
 	copy(buf[4:], data)
@@ -45,6 +50,10 @@ func ReceivePacket(conn net.Conn) (packet.IPacket, error) {
 	buf := *bufPtr
 
 	length := binary.BigEndian.Uint32(lengthBuf)
+	if int(length) > bufSize {
+		return nil, io.ErrShortBuffer
+	}
+
 	buf = buf[:length]
 	n, err := io.ReadFull(conn, buf)
 	if err != nil {
