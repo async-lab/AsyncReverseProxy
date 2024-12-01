@@ -20,7 +20,7 @@ func EventHandlerPacketEnd(event *event.EventReceivedPacket[*packet.PacketEnd]) 
 }
 
 func EventHandlerPacketUnknown(event *event.EventReceivedPacket[*packet.PacketUnknown]) bool {
-	event.Conn.Write([]byte("Hello, world!"))
+	event.Conn.Write([]byte("HTTP/1.1 200 OK\nContent-Type: text/plain; charset=utf-8\nContent-Length: 13\n\nHello, world!"))
 	logger.Error("Unknown packet received")
 	return false
 }
