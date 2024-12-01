@@ -47,6 +47,11 @@ var logger = logrus.New()
 
 func Init() {
 	logger.SetFormatter(&GeneralFormatter{})
+	if config.IsVerbose {
+		logger.SetLevel(logrus.DebugLevel)
+	} else {
+		logger.SetLevel(logrus.InfoLevel)
+	}
 }
 
 func GetLogger() *logrus.Logger {

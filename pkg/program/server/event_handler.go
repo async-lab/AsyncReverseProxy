@@ -26,6 +26,7 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 		})
 	}
 
+	// 检查token
 	if e.Packet.Token != server.Config.Server.Token {
 		sendResponse(false, "Invalid token")
 		return false
@@ -38,9 +39,9 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 			Weight:   e.Packet.Weight,
 			Conn:     e.Conn,
 		})
-
 		logger.Info("[", e.Packet.Name, "] (", lb.Len(), ") new negotiation success")
 
+		// 监听连接关闭，关闭后从负载均衡器中移除该代理连接
 		go func() {
 			defer func() {
 				if lb != nil {
@@ -62,28 +63,32 @@ func EventHandlerReceivedPacketProxyNegotiationRequest(e *event.EventReceivedPac
 		}()
 	}
 
-	skip, isSuccess := false, true
-
+	// 检查是否已存在该会话，有的话就跳过Listener创建
+	skip, computeError := false, error(nil)
 	server.Sessions.Compute(func(s *structure.SyncMap[string, container.Entry[string, *comm.Listener]]) {
 		if _, ok := server.Sessions.Load(e.Packet.Name); ok {
 			addToLoadBalancers()
-			sendResponse(true, "")
-			skip, isSuccess = true, true
+			skip = true
 			return
 		}
 
 		listener, err := net.Listen("tcp", e.Packet.FrontendAddress)
 		if err != nil {
-			sendResponse(false, err.Error())
-			skip, isSuccess = true, true
+			skip, computeError = true, err
 			return
 		}
 
 		server.Sessions.Store(e.Packet.Name, *container.NewEntry(e.Packet.FrontendAddress, comm.NewListenerWithParentCtx(server.Ctx, listener)))
 	})
 
+	if computeError != nil {
+		sendResponse(false, computeError.Error())
+	} else {
+		sendResponse(true, "")
+	}
+
 	if skip {
-		return isSuccess
+		return computeError == nil
 	}
 
 	addToLoadBalancers()

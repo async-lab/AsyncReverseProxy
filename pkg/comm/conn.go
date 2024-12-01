@@ -10,8 +10,8 @@ import (
 type Conn struct {
 	net.Conn
 	Ctx       context.Context
-	CtxCancel context.CancelFunc
-	Closed    bool
+	ctxCancel context.CancelFunc
+	closed    bool
 }
 
 func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
@@ -23,8 +23,8 @@ func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
 	ret := &Conn{
 		Conn:      conn,
 		Ctx:       ctx,
-		CtxCancel: cancel,
-		Closed:    false,
+		ctxCancel: cancel,
+		closed:    false,
 	}
 	go func() {
 		defer ret.Close()
@@ -65,8 +65,12 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 
 func (c *Conn) Close() error {
 	defer func() {
-		c.CtxCancel()
-		c.Closed = true
+		c.ctxCancel()
+		c.closed = true
 	}()
 	return c.Conn.Close()
+}
+
+func (c *Conn) isClosed() bool {
+	return c.closed
 }
