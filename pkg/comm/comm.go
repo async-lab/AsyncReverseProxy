@@ -11,7 +11,7 @@ import (
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		buf := make([]byte, 4+32*1024*1024)
+		buf := make([]byte, 4+32*1024)
 		return &buf
 	},
 }
