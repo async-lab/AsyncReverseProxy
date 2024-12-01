@@ -9,9 +9,11 @@ import (
 	"club.asynclab/asrp/pkg/packet"
 )
 
+var reserved = 1024 // 读取时为头部和序列化预留的长度
+
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		buf := make([]byte, 4+32*1024)
+		buf := make([]byte, 4+128*1024)
 		return &buf
 	},
 }
@@ -61,7 +63,7 @@ func ReadForBytes(conn net.Conn) ([]byte, error) {
 	defer bufPool.Put(bufPtr)
 	buf := *bufPtr
 
-	n, err := conn.Read(buf)
+	n, err := conn.Read(buf[:reserved])
 	if err != nil {
 		return nil, err
 	}
