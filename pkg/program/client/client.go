@@ -6,30 +6,26 @@ import (
 	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/hof"
 	"club.asynclab/asrp/pkg/base/structure"
-	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/config"
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/program"
 	"club.asynclab/asrp/pkg/program/general"
+	"club.asynclab/asrp/pkg/program/session"
 )
 
 var logger = logging.GetLogger()
 
 type Client struct {
 	program.MetaProgram
-	Config             *config.ConfigClient
-	Sessions           *structure.SyncMap[container.Entry[string, string], string] // (name, server) -> backend_address
-	ProxyConnections   *structure.SyncMap[string, *comm.Conn]                      // uuid -> conn
-	BackendConnections *structure.SyncMap[string, *comm.Conn]                      // uuid -> conn
+	Config   *config.ConfigClient
+	Sessions *structure.SyncMap[string, *session.ClientSession]
 }
 
 func NewClient(ctx context.Context, config *config.ConfigClient) *Client {
 	client := &Client{
-		MetaProgram:        *program.NewMetaProgram(ctx),
-		Config:             config,
-		Sessions:           structure.NewSyncMap[container.Entry[string, string], string](),
-		ProxyConnections:   structure.NewSyncMap[string, *comm.Conn](),
-		BackendConnections: structure.NewSyncMap[string, *comm.Conn](),
+		MetaProgram: *program.NewMetaProgram(ctx),
+		Config:      config,
+		Sessions:    structure.NewSyncMap[string, *session.ClientSession](),
 	}
 	general.AddGeneralEventHandler(client.EventBus)
 	AddClientEventHandler(client.EventBus)

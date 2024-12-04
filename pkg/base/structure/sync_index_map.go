@@ -3,12 +3,12 @@ package structure
 import "github.com/google/uuid"
 
 type SyncIndexMap[T comparable] struct {
-	SyncMap[string, T]
+	*SyncMap[string, T]
 }
 
 func NewSyncIndexMap[T comparable]() *SyncIndexMap[T] {
 	return &SyncIndexMap[T]{
-		SyncMap: *NewSyncMap[string, T](),
+		SyncMap: NewSyncMap[string, T](),
 	}
 }
 

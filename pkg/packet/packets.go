@@ -12,13 +12,12 @@ type PacketProxyNegotiationRequest struct {
 	// 提交字段
 	Name            string
 	FrontendAddress string
-	Priority        int64
-	Weight          int64
+	Priority        uint32
+	Weight          uint32
 	Token           string
 
 	// 回显字段
 	RemoteServerName string
-	BackendAddress   string
 }
 
 // s to c
@@ -32,7 +31,6 @@ type PacketProxyNegotiationResponse struct {
 
 	// 原回显字段
 	RemoteServerName string
-	BackendAddress   string
 }
 
 // s to c
@@ -47,6 +45,7 @@ type PacketNewEndSideConnection struct {
 //
 // 终端连接关闭
 type PacketEndSideConnectionClosed struct {
+	Name string
 	Uuid string
 }
 
@@ -58,13 +57,6 @@ type PacketProxyData struct {
 	Uuid string
 	Data []byte
 }
-
-// c to s
-//
-// 心跳
-// type PacketHeartbeat struct {
-// 	Name string
-// }
 
 // both
 //

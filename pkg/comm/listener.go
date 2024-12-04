@@ -28,16 +28,11 @@ func NewListenerWithParentCtx(parentCtx context.Context, listener net.Listener) 
 	}
 	go func() {
 		defer ret.Close()
-		switch listener := listener.(type) {
-		case *Listener:
-			select {
-			case <-listener.Ctx.Done():
-				break
-			case <-ctx.Done():
-				break
-			}
-		default:
-			<-ctx.Done()
+		select {
+		case <-ret.Ctx.Done():
+			break
+		case <-ctx.Done():
+			break
 		}
 	}()
 	return ret
@@ -47,12 +42,15 @@ func NewListener(listener net.Listener) *Listener {
 	return NewListenerWithParentCtx(context.Background(), listener)
 }
 
-func (l *Listener) Accept() (c net.Conn, err error) {
-	c, err = l.Listener.Accept()
+func (l *Listener) Accept() (*Conn, error) {
+	c, err := l.Listener.Accept()
 	if lang.IsNetClose(err) {
 		l.Close()
 	}
-	return
+	if c == nil {
+		return nil, err
+	}
+	return NewConnWithParentCtx(l.Ctx, c), err
 }
 
 func (l *Listener) Close() error {

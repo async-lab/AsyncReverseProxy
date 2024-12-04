@@ -19,6 +19,10 @@ func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
 		panic("parentCtx is nil")
 	}
 
+	if conn == nil {
+		panic("conn is nil")
+	}
+
 	ctx, cancel := context.WithCancel(parentCtx)
 	ret := &Conn{
 		Conn:      conn,
@@ -28,16 +32,11 @@ func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
 	}
 	go func() {
 		defer ret.Close()
-		switch conn := conn.(type) {
-		case *Conn:
-			select {
-			case <-conn.Ctx.Done():
-				break
-			case <-ctx.Done():
-				break
-			}
-		default:
-			<-ctx.Done()
+		select {
+		case <-ret.Ctx.Done():
+			break
+		case <-ctx.Done():
+			break
 		}
 	}()
 	return ret

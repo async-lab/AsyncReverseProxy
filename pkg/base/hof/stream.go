@@ -32,8 +32,8 @@ func NewStreamWithSliceWithLocker[T any](slice []T, locker sync.Locker) *Stream[
 	s := NewStreamWithLocker(source, locker)
 	go func() {
 		defer close(source)
-		for _, item := range slice {
-			source <- *container.NewWrapper(item)
+		for i := range slice {
+			source <- *container.NewWrapperWithPtr(&slice[i])
 		}
 	}()
 	return s

@@ -3,32 +3,27 @@ package server
 import (
 	"context"
 
-	"club.asynclab/asrp/pkg/base/container"
 	"club.asynclab/asrp/pkg/base/structure"
-	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/config"
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/program"
 	"club.asynclab/asrp/pkg/program/general"
+	"club.asynclab/asrp/pkg/program/session"
 )
 
 var logger = logging.GetLogger()
 
 type Server struct {
 	program.MetaProgram
-	Config              *config.ConfigServer
-	Sessions            *structure.SyncMap[string, container.Entry[string, *comm.Listener]] // name -> frontend_address, listener
-	FrontendConnections *structure.SyncMap[string, container.Entry[*comm.Conn, *comm.Conn]] // uuid -> frontConn, proxyConn
-	LoadBalancers       *structure.SyncMap[string, *program.LoadBalancer]                   // name -> lb[proxyConn]
+	Config   *config.ConfigServer
+	Sessions *structure.SyncMap[string, *session.ServerSession]
 }
 
 func NewServer(ctx context.Context, config *config.ConfigServer) *Server {
 	server := &Server{
-		MetaProgram:         *program.NewMetaProgram(ctx),
-		Config:              config,
-		Sessions:            structure.NewSyncMap[string, container.Entry[string, *comm.Listener]](),
-		FrontendConnections: structure.NewSyncMap[string, container.Entry[*comm.Conn, *comm.Conn]](),
-		LoadBalancers:       structure.NewSyncMap[string, *program.LoadBalancer](),
+		MetaProgram: *program.NewMetaProgram(ctx),
+		Config:      config,
+		Sessions:    structure.NewSyncMap[string, *session.ServerSession](),
 	}
 	general.AddGeneralEventHandler(server.EventBus)
 	AddServerEventHandler(server.EventBus)

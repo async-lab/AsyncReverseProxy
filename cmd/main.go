@@ -28,8 +28,10 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&config.IsVerbose, "verbose", "v", false, "verbose output")
 
-	start := func(path string, config config.IConfig, prog program.IProgram) {
-		if _, err := toml.DecodeFile(path, config); err != nil {
+	start := func(path string, cfg config.IConfig, prog program.IProgram) {
+		logging.Init(config.IsVerbose)
+
+		if _, err := toml.DecodeFile(path, cfg); err != nil {
 			logger.Error("Error decoding config file: ", err)
 			return
 		}
@@ -59,10 +61,6 @@ func init() {
 			start(args[0], cfg, client.NewClient(ctx, cfg))
 		},
 	})
-
-	if config.IsVerbose {
-		logging.Init()
-	}
 
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)

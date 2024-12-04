@@ -5,7 +5,7 @@ import (
 )
 
 type SyncQueue[T any] struct {
-	MetaSyncStructure[SyncQueue[T]]
+	*MetaSyncStructure[SyncQueue[T]]
 	DataQueue []T
 	cond      *sync.Cond
 }
@@ -13,7 +13,7 @@ type SyncQueue[T any] struct {
 func NewSyncQueue[T any]() *SyncQueue[T] {
 	meta := NewMetaSyncStructure[SyncQueue[T]]()
 	return &SyncQueue[T]{
-		MetaSyncStructure: *meta,
+		MetaSyncStructure: meta,
 		DataQueue:         make([]T, 0),
 		cond:              sync.NewCond(meta.Lock),
 	}

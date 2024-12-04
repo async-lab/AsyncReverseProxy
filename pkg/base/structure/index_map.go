@@ -77,13 +77,6 @@ func (self *IndexMap[T]) CompareAndSwap(key string, old, new T) (swapped bool) {
 	}
 	return false
 }
-func (self *IndexMap[T]) Range(f func(key string, value T) bool) {
-	for k, v := range self.m {
-		if !f(k, v) {
-			break
-		}
-	}
-}
 
 func (self *IndexMap[T]) Len() int {
 	return len(self.m)

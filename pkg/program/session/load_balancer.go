@@ -1,4 +1,4 @@
-package program
+package session
 
 import (
 	"net"
@@ -10,32 +10,36 @@ import (
 )
 
 type ProxyConnection struct {
-	Priority int64
-	Weight   int64
-	Conn     *comm.Conn
+	*comm.Conn
+	Priority int
+	Weight   int
 }
 
 type LoadBalancer struct {
 	structure.MetaSyncStructure[LoadBalancer]
-	connections  *structure.IndexMap[*ProxyConnection]
-	totalWeights map[int64]int64 // priority -> totalWeight
-	currentIndex int64
+	connections  *structure.IndexMap[ProxyConnection]
+	totalWeights map[int]int // priority -> totalWeight
+	currentIndex int
 }
 
 func NewLoadBalancer() *LoadBalancer {
 	return &LoadBalancer{
-		connections:       structure.NewIndexMap[*ProxyConnection](),
-		totalWeights:      make(map[int64]int64),
+		connections:       structure.NewIndexMap[ProxyConnection](),
+		totalWeights:      make(map[int]int),
 		currentIndex:      0,
 		MetaSyncStructure: *structure.NewMetaSyncStructure[LoadBalancer](),
 	}
 }
 
-func (lb *LoadBalancer) AddConn(conn *ProxyConnection) (uuid string) {
+func (lb *LoadBalancer) AddConn(conn *comm.Conn, priority int, weight int) (uuid string) {
 	lb.Lock.Lock()
 	defer lb.Lock.Unlock()
-	uuid = lb.connections.Store(conn)
-	lb.totalWeights[conn.Priority] += conn.Weight
+	uuid = lb.connections.Store(ProxyConnection{
+		Conn:     conn,
+		Priority: priority,
+		Weight:   weight,
+	})
+	lb.totalWeights[priority] += weight
 	return
 }
 
@@ -61,23 +65,23 @@ func (lb *LoadBalancer) Next() (uuid string, conn *comm.Conn, ok bool) {
 		return
 	}
 
-	totalWeight, _ok := hof.NewStreamWithMap(lb.totalWeights).Max(func(bigger container.Entry[int64, int64], smaller container.Entry[int64, int64]) bool {
-		return bigger.Key > smaller.Key
+	totalWeight, _ok := hof.NewStreamWithMap(lb.totalWeights).Max(func(bigger container.Entry[int, int], smaller container.Entry[int, int]) bool {
+		return bigger.GetKey() > smaller.GetKey()
 	})
 
-	if !_ok || totalWeight.Value == 0 {
+	if !_ok || totalWeight.GetValue() == 0 {
 		return
 	}
 
-	lb.currentIndex = (lb.currentIndex + 1) % totalWeight.Value // TODO 这里不知道为什么value有时候会为0，先加个判断
+	lb.currentIndex = (lb.currentIndex + 1) % totalWeight.GetValue() // TODO 这里不知道为什么value有时候会为0，先加个判断
 	i := lb.currentIndex
 
-	lb.connections.Stream().Filter(func(t container.Entry[string, *ProxyConnection]) bool {
-		return (*t.Value).Priority == totalWeight.Key
-	}).Range(func(t container.Entry[string, *ProxyConnection]) bool {
-		i -= (*t.Value).Weight
+	lb.connections.Stream().Filter(func(t container.Entry[string, ProxyConnection]) bool {
+		return t.GetValue().Priority == totalWeight.GetKey()
+	}).Range(func(t container.Entry[string, ProxyConnection]) bool {
+		i -= t.GetValue().Weight
 		if i < 0 {
-			uuid, conn, ok = t.Key, t.Value.Conn, true
+			uuid, conn, ok = t.GetKey(), t.GetValue().Conn, true
 			return false
 		}
 		return true

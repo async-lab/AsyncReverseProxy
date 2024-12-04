@@ -10,7 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type GeneralFormatter struct{}
+type GeneralFormatter struct {
+	IsVerbose bool
+}
 
 func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	b := &strings.Builder{}
@@ -35,7 +37,7 @@ func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		showPath = "..." + showPath
 	}
 
-	if config.IsVerbose {
+	if f.IsVerbose {
 		fmt.Fprintf(b, "[%s %5s] [%s:%d]: %s\n", now, level, showPath, line, message)
 	} else {
 		fmt.Fprintf(b, "[%s %5s]: %s\n", now, level, message)
@@ -45,8 +47,8 @@ func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 var logger = logrus.New()
 
-func Init() {
-	logger.SetFormatter(&GeneralFormatter{})
+func Init(isVerbose bool) {
+	logger.SetFormatter(&GeneralFormatter{IsVerbose: isVerbose})
 	if config.IsVerbose {
 		logger.SetLevel(logrus.DebugLevel)
 	} else {
@@ -59,5 +61,5 @@ func GetLogger() *logrus.Logger {
 }
 
 func init() {
-	Init()
+	Init(false)
 }

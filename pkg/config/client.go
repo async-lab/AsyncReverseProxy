@@ -11,8 +11,8 @@ type ConfigItemProxy struct {
 	RemoteServers   []string `toml:"remote_servers"`
 	BackendAddress  string   `toml:"backend_address"`
 	FrontendAddress string   `toml:"frontend_address"`
-	Priority        int64    `toml:"priority"`
-	Weight          int64    `toml:"weight"`
+	Priority        uint32   `toml:"priority"`
+	Weight          uint32   `toml:"weight"`
 }
 
 type ConfigClient struct {

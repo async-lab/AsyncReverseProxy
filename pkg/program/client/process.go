@@ -9,6 +9,7 @@ import (
 	"club.asynclab/asrp/pkg/comm"
 	"club.asynclab/asrp/pkg/config"
 	"club.asynclab/asrp/pkg/packet"
+	"club.asynclab/asrp/pkg/program/session"
 )
 
 // 包装好的连接消费器
@@ -39,26 +40,23 @@ func (client *Client) Hello(remoteAddress string) {
 }
 
 func (client *Client) StartProxy(remoteServer config.ConfigItemRemoteServer, proxy config.ConfigItemProxy) {
+	client.Sessions.LoadOrStore(proxy.Name, session.NewClientSession(proxy.Name, proxy.BackendAddress))
 	for {
 		select {
 		case <-client.Ctx.Done():
 			return
 		default:
 			client.Consume(remoteServer.Address, func(conn *comm.Conn) bool {
-				ok := client.SendPacket(conn, &packet.PacketProxyNegotiationRequest{
+				return client.SendPacket(conn, &packet.PacketProxyNegotiationRequest{
 					Name:             proxy.Name,
 					FrontendAddress:  proxy.FrontendAddress,
 					Priority:         proxy.Priority,
 					Weight:           proxy.Weight,
 					Token:            remoteServer.Token,
 					RemoteServerName: remoteServer.Name,
-					BackendAddress:   proxy.BackendAddress,
 				})
-				return ok
 			})
 		}
-
-		client.Sessions.Delete(*container.NewEntry(proxy.Name, remoteServer.Name))
 
 		logger.Info("[", proxy.Name, "] -> [", remoteServer.Name, "] closed, retrying in ", config.SleepTime, " seconds...")
 		time.Sleep(time.Duration(config.SleepTime) * time.Second)
