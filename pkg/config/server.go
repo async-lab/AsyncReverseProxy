@@ -1,8 +1,8 @@
 package config
 
 type ConfigItemServer struct {
-	ListenAddress string `toml:"listen_address"`
-	Token         string `toml:"token"`
+	Listen string `toml:"listen"`
+	Token  string `toml:"token"`
 }
 
 type ConfigServer struct {

@@ -1,9 +1,9 @@
-[[remote_servers]]
+[[remotes]]
 name = "server1"
 address = "localhost:8080"
 token = "qwhrqwh"
 
-[[remote_servers]]
+[[remotes]]
 name = "server2"
 address = "localhost:8081"
 token = "qwhrqwh"
@@ -11,17 +11,17 @@ token = "qwhrqwh"
 
 [[proxies]]
 name = "proxy1"
-remote_servers = ["server1", "server2"]
-backend_address = "localhost:80"
-frontend_address = "localhost:54321"
-priority = 0                            # bigger is higher priority
+remotes = ["server1", "server2"]
+backend = "localhost:80"
+frontend = "localhost:54321"
+priority = 0                     # bigger is higher priority
 weight = 1
 
 [[proxies]]
 name = "proxy2"
-remote_servers = ["server1"]
-backend_address = "localhost:3000"
-frontend_address = "localhost:54322"
+remotes = ["server1"]
+backend = "localhost:3000"
+frontend = "localhost:54322"
 priority = 0
 weight = 1
 

@@ -11,6 +11,7 @@ import (
 	"club.asynclab/asrp/pkg/program"
 	"club.asynclab/asrp/pkg/program/general"
 	"club.asynclab/asrp/pkg/program/session"
+
 )
 
 var logger = logging.GetLogger()
@@ -49,23 +50,23 @@ func (client *Client) CheckConfig() bool {
 		logger.Error("Proxies is nil")
 		return false
 	}
-	if client.Config.RemoteServers == nil {
-		logger.Error("RemoteServers is nil")
+	if client.Config.Remotes == nil {
+		logger.Error("Remotes is nil")
 		return false
 	}
 	for _, proxy := range client.Config.Proxies {
-		if len(proxy.RemoteServers) == 0 {
-			logger.Error("[", proxy.Name, "]'s RemoteServers is empty")
+		if len(proxy.Remotes) == 0 {
+			logger.Error("[", proxy.Name, "]'s Remotes is empty")
 			return false
 		}
 
-		ok := !hof.NewStreamWithSlice(proxy.RemoteServers).
+		ok := !hof.NewStreamWithSlice(proxy.Remotes).
 			Filter(func(w container.Wrapper[string]) bool {
-				ok := !hof.NewStreamWithSlice(client.Config.RemoteServers).
-					Filter(func(c container.Wrapper[*config.ConfigItemRemoteServer]) bool { return (*c.Get()).Name == w.Get() }).
+				ok := !hof.NewStreamWithSlice(client.Config.Remotes).
+					Filter(func(c container.Wrapper[*config.ConfigItemRemote]) bool { return (*c.Get()).Name == w.Get() }).
 					IsEmpty()
 				if !ok {
-					logger.Error("RemoteServer not found: ", w.Get())
+					logger.Error("Remote not found: ", w.Get())
 				}
 				return ok
 			}).IsEmpty()

@@ -24,7 +24,7 @@ func (server *Server) Listen() {
 		return
 	}
 
-	_listener, err := tls.Listen("tcp", server.Config.Server.ListenAddress, &tls.Config{Certificates: []tls.Certificate{cert}})
+	_listener, err := tls.Listen("tcp", server.Config.Server.Listen, &tls.Config{Certificates: []tls.Certificate{cert}})
 	if err != nil {
 		logger.Error("Error listening: ", err)
 		return
@@ -32,7 +32,7 @@ func (server *Server) Listen() {
 
 	listener := comm.NewListenerWithParentCtx(server.Ctx, _listener)
 
-	logger.Info("Listening on: ", server.Config.Server.ListenAddress)
+	logger.Info("Listening on: ", server.Config.Server.Listen)
 
 	go pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
 		WithCtx(server.Ctx).

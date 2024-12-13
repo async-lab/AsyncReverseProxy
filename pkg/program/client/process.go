@@ -39,8 +39,8 @@ func (client *Client) Hello(remoteAddress string) {
 	})
 }
 
-func (client *Client) StartProxy(remoteServer config.ConfigItemRemoteServer, proxy config.ConfigItemProxy) {
-	client.Sessions.LoadOrStore(proxy.Name, session.NewClientSession(proxy.Name, proxy.BackendAddress))
+func (client *Client) StartProxy(remoteServer config.ConfigItemRemote, proxy config.ConfigItemProxy) {
+	client.Sessions.LoadOrStore(proxy.Name, session.NewClientSession(proxy.Name, proxy.Backend))
 	for {
 		select {
 		case <-client.Ctx.Done():
@@ -49,7 +49,7 @@ func (client *Client) StartProxy(remoteServer config.ConfigItemRemoteServer, pro
 			client.Consume(remoteServer.Address, func(conn *comm.Conn) bool {
 				return client.SendPacket(conn, &packet.PacketProxyNegotiationRequest{
 					Name:             proxy.Name,
-					FrontendAddress:  proxy.FrontendAddress,
+					FrontendAddress:  proxy.Frontend,
 					Priority:         proxy.Priority,
 					Weight:           proxy.Weight,
 					Token:            remoteServer.Token,
@@ -65,12 +65,12 @@ func (client *Client) StartProxy(remoteServer config.ConfigItemRemoteServer, pro
 
 func (client *Client) StartProxyFromConfig() {
 	for _, proxy := range client.Config.Proxies {
-		hof.NewStreamWithSlice(client.Config.RemoteServers).
-			Filter(func(c container.Wrapper[*config.ConfigItemRemoteServer]) bool {
-				return !hof.NewStreamWithSlice(proxy.RemoteServers).
+		hof.NewStreamWithSlice(client.Config.Remotes).
+			Filter(func(c container.Wrapper[*config.ConfigItemRemote]) bool {
+				return !hof.NewStreamWithSlice(proxy.Remotes).
 					Filter(func(w container.Wrapper[string]) bool { return (*c.Get()).Name == w.Get() }).
 					IsEmpty()
-			}).ForEach(func(s container.Wrapper[*config.ConfigItemRemoteServer]) {
+			}).ForEach(func(s container.Wrapper[*config.ConfigItemRemote]) {
 			go client.StartProxy(*s.Get(), *proxy)
 		})
 	}
