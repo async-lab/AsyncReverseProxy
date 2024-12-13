@@ -32,11 +32,12 @@ func (s *ServerSession) AddProxyConn(proxyConn *comm.Conn, priority int, weight 
 	go func() {
 		defer func() {
 			s.Lb.RemoveConn(uuid)
-			logger.Info("[", s.Name, "] (", s.Lb.Len(), ") connection closed")
 			if s.Lb.Len() == 0 {
 				s.Listener.Close()
-				logger.Info("[", s.Name, "] all connections closed")
+				logger.Info("[", s.Name, "] (", s.Lb.Len(), ") connection closed, all connections closed")
 				cancel()
+			} else {
+				logger.Info("[", s.Name, "] (", s.Lb.Len(), ") connection closed")
 			}
 		}()
 		<-proxyConn.Ctx.Done()
