@@ -9,9 +9,31 @@ import (
 
 type Conn struct {
 	net.Conn
-	Ctx       context.Context
+	ctx       context.Context
 	ctxCancel context.CancelFunc
-	closed    bool
+}
+
+func NewConnWithCtx(ctx context.Context, cancel context.CancelFunc, conn net.Conn) *Conn {
+	if ctx == nil {
+		panic("ctx is nil")
+	}
+	if cancel == nil {
+		panic("cancel is nil")
+	}
+	if conn == nil {
+		panic("conn is nil")
+	}
+
+	ret := &Conn{
+		Conn:      conn,
+		ctx:       ctx,
+		ctxCancel: cancel,
+	}
+	go func() {
+		defer ret.Close()
+		<-ctx.Done()
+	}()
+	return ret
 }
 
 func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
@@ -19,27 +41,8 @@ func NewConnWithParentCtx(parentCtx context.Context, conn net.Conn) *Conn {
 		panic("parentCtx is nil")
 	}
 
-	if conn == nil {
-		panic("conn is nil")
-	}
-
 	ctx, cancel := context.WithCancel(parentCtx)
-	ret := &Conn{
-		Conn:      conn,
-		Ctx:       ctx,
-		ctxCancel: cancel,
-		closed:    false,
-	}
-	go func() {
-		defer ret.Close()
-		select {
-		case <-ret.Ctx.Done():
-			break
-		case <-ctx.Done():
-			break
-		}
-	}()
-	return ret
+	return NewConnWithCtx(ctx, cancel, conn)
 }
 
 func NewConn(conn net.Conn) *Conn {
@@ -48,7 +51,7 @@ func NewConn(conn net.Conn) *Conn {
 
 func (c *Conn) Read(b []byte) (n int, err error) {
 	n, err = c.Conn.Read(b)
-	if lang.IsNetClose(err) {
+	if lang.IsNetLost(err) {
 		c.Close()
 	}
 	return
@@ -56,20 +59,21 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 
 func (c *Conn) Write(b []byte) (n int, err error) {
 	n, err = c.Conn.Write(b)
-	if lang.IsNetClose(err) {
+	if lang.IsNetLost(err) {
 		c.Close()
 	}
 	return
 }
 
+func (c *Conn) GetCtx() context.Context {
+	return c.ctx
+}
+
 func (c *Conn) Close() error {
-	defer func() {
-		c.ctxCancel()
-		c.closed = true
-	}()
+	c.ctxCancel()
 	return c.Conn.Close()
 }
 
-func (c *Conn) isClosed() bool {
-	return c.closed
+func (c *Conn) IsClosed() bool {
+	return c.ctx.Err() != nil
 }

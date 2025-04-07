@@ -1,60 +1,54 @@
 package packet
 
-// both
-//
-// 打招呼
-type PacketHello struct{}
+type PacketUnknown struct {
+	Err error
+}
 
 // c to s
 //
 // 请求一个新的代理
 type PacketProxyNegotiationRequest struct {
-	// 提交字段
-	Name            string
-	FrontendAddress string
-	Priority        uint32
-	Weight          uint32
-	Token           string
-
-	// 回显字段
-	RemoteServerName string
+	Name         string
+	FrontendAddr string
+	Priority     uint32
+	Weight       uint32
+	Token        string
 }
 
 // s to c
 //
 // 代理请求确认
 type PacketProxyNegotiationResponse struct {
-	// 响应字段
-	Name    string
 	Success bool
 	Reason  string
-
-	// 原回显字段
-	RemoteServerName string
 }
 
-// s to c
-//
-// 新终端连接
-type PacketNewEndSideConnection struct {
-	Name string
+// -------------------------------------------------------
+
+type IPacketForConn interface {
+	GetUuid() string
+}
+
+type MetaPacketForConn struct {
 	Uuid string
+}
+
+func (m *MetaPacketForConn) GetUuid() string {
+	return m.Uuid
 }
 
 // both
 //
 // 终端连接关闭
 type PacketEndSideConnectionClosed struct {
-	Name string
-	Uuid string
+	MetaPacketForConn
 }
 
 // both
 //
 // 代理数据包
 type PacketProxyData struct {
-	Name string
-	Uuid string
+	MetaPacketForConn
 	Data []byte
 }
 
@@ -64,10 +58,9 @@ type PacketProxyData struct {
 type PacketEnd struct{}
 
 func init() {
-	RegisterPacket[PacketHello]()
+	RegisterPacketWithKey[PacketUnknown](0)
 	RegisterPacket[PacketProxyNegotiationRequest]()
 	RegisterPacket[PacketProxyNegotiationResponse]()
-	RegisterPacket[PacketNewEndSideConnection]()
 	RegisterPacket[PacketEndSideConnectionClosed]()
 	RegisterPacket[PacketProxyData]()
 	RegisterPacket[PacketEnd]()

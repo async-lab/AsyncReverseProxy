@@ -1,71 +1,42 @@
 package session
 
 import (
-	"net"
+	"context"
 
-	"club.asynclab/asrp/pkg/comm"
-	"club.asynclab/asrp/pkg/packet"
-	"club.asynclab/asrp/pkg/program"
+	"club.asynclab/asrp/pkg/arch"
+	"club.asynclab/asrp/pkg/arch/dialers"
+	"club.asynclab/asrp/pkg/base/channel"
 )
 
 type ClientSession struct {
-	*MetaSessionForConnection
-	BackendAddress string
-	// ProxyConns     *structure.SyncMap[string, *comm.Conn]
+	Ctx       context.Context
+	CtxCancel context.CancelFunc
+	Forwarder arch.IForwarder
+	Dialer    arch.IDialer
 }
 
-func NewClientSession(name string, backendAddress string) *ClientSession {
-	return &ClientSession{
-		MetaSessionForConnection: NewMetaSessionForConnection(name),
-		BackendAddress:           backendAddress,
-		// ProxyConns:               structure.NewSyncMap[string, *comm.Conn](), // connUuid -> proxyConn
-	}
-}
-
-// func (s *ClientSession) AddProxyConnection(uuid string, conn *comm.Conn) {
-// 	s.ProxyConns.Store(uuid, conn)
-
-// 	go func() {
-// 		defer s.ProxyConns.Delete(uuid)
-// 		<-conn.Ctx.Done()
-// 	}()
-// }
-
-func (s *ClientSession) AcceptFrontendConnection(uuid string, proxyConn *comm.Conn) bool {
-	_conn, err := net.Dial("tcp", s.BackendAddress)
+func NewClientSession(parentCtx context.Context, forwarder arch.IForwarder, backendAddr string) (*ClientSession, error) {
+	ctx, cancel := context.WithCancel(parentCtx)
+	dialer, err := dialers.NewDialerTCP(ctx, backendAddr)
 	if err != nil {
-		return program.Program.SendPacket(proxyConn, &packet.PacketEndSideConnectionClosed{Name: s.Name, Uuid: uuid})
+		cancel()
+		return nil, err
 	}
-	conn := comm.NewConnWithParentCtx(proxyConn.Ctx, _conn)
-	s.EndConns.Store(uuid, conn)
 
-	logger.Debug("[", s.Name, "] (", s.EndConns.Len(), ") end connection established")
+	s := &ClientSession{
+		Ctx:       ctx,
+		CtxCancel: cancel,
+		Forwarder: forwarder,
+		Dialer:    dialer,
+	}
+
+	go channel.ConsumeWithCtx(s.Ctx, s.Dialer.GetChanSendPacket(), s.Forwarder.HandlePacket)
+	go channel.ConsumeWithCtx(s.Ctx, s.Forwarder.GetChanSendPacket(), s.Dialer.HandlePacket)
 
 	go func() {
-		defer s.EndConns.Delete(uuid)
-		<-conn.Ctx.Done()
+		<-forwarder.GetCtx().Done()
+		cancel()
 	}()
 
-	go func() {
-		defer program.Program.SendPacket(proxyConn, &packet.PacketEndSideConnectionClosed{Name: s.Name, Uuid: uuid})
-		defer conn.Close()
-
-		for {
-			bytes, err := comm.ReadForBytes(conn)
-			if err != nil {
-				if conn.Ctx.Err() != nil {
-					return
-				}
-				continue
-			}
-
-			program.Program.SendPacket(proxyConn, &packet.PacketProxyData{
-				Name: s.Name,
-				Uuid: uuid,
-				Data: bytes,
-			})
-		}
-	}()
-
-	return true
+	return s, nil
 }

@@ -11,14 +11,12 @@ import (
 
 type IPacket interface{}
 
-type NetPackData map[string]interface{}
-
 type NetPacket struct {
 	Type int
-	Data NetPackData
+	Data []byte
 }
 
-//----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
 
 var TypeMap = structure.NewBiMap[int, reflect.Type]()
 
@@ -38,7 +36,7 @@ func GetNetPacketType(p IPacket) int {
 	return t
 }
 
-//----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
 
 func (netPacket *NetPacket) Serialize() ([]byte, error) { return msgpack.Marshal(netPacket) }
 func Deserialize(bytes []byte) (*NetPacket, error) {
@@ -46,34 +44,25 @@ func Deserialize(bytes []byte) (*NetPacket, error) {
 	return &netPacket, msgpack.Unmarshal(bytes, &netPacket)
 }
 
-func ToNetPacket(p IPacket) *NetPacket {
+func ToNetPacket(p IPacket) (*NetPacket, error) {
+	bytes, err := msgpack.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
 	return &NetPacket{
 		Type: GetNetPacketType(p),
-		Data: lang.StructToMap(p),
-	}
+		Data: bytes,
+	}, nil
 }
 
-func FromNetPacket(netPacket *NetPacket) IPacket {
+func FromNetPacket(netPacket *NetPacket) (IPacket, error) {
 	if t, ok := TypeMap.GetValue(netPacket.Type); ok && netPacket.Type != 0 {
 		p := reflect.New(t).Interface().(IPacket)
-		if err := lang.MapToStruct(netPacket.Data, &p); err != nil {
-			return &PacketUnknown{Err: err}
+		if err := msgpack.Unmarshal(netPacket.Data, &p); err != nil {
+			return nil, err
 		}
-		return p
+		return p, nil
 	}
 
-	return &PacketUnknown{Err: fmt.Errorf("unknown packet type: %d", netPacket.Type)}
-}
-
-//----------------------------------------------------------------------------------------------------
-
-// both
-//
-// 未知
-type PacketUnknown struct {
-	Err error
-}
-
-func init() {
-	RegisterPacketWithKey[PacketUnknown](0)
+	return nil, fmt.Errorf("unknown packet type: %d", netPacket.Type)
 }

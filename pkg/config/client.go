@@ -1,9 +1,9 @@
 package config
 
 type ConfigItemRemote struct {
-	Name    string `toml:"name"`
-	Address string `toml:"address"`
-	Token   string `toml:"token"`
+	Name  string `toml:"name"`
+	Addr  string `toml:"addr"`
+	Token string `toml:"token"`
 }
 
 type ConfigItemProxy struct {
@@ -16,6 +16,6 @@ type ConfigItemProxy struct {
 }
 
 type ConfigClient struct {
-	Remotes []*ConfigItemRemote `toml:"remotes"`
-	Proxies []*ConfigItemProxy  `toml:"proxies"`
+	Remotes []ConfigItemRemote `toml:"remotes"`
+	Proxies []ConfigItemProxy  `toml:"proxies"`
 }

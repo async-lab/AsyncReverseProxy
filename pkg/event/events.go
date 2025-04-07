@@ -13,8 +13,3 @@ type EventReceivedPacket[T packet.IPacket] struct {
 func NewEventReceivedPacket[T packet.IPacket](conn *comm.Conn, packet T) *EventReceivedPacket[T] {
 	return &EventReceivedPacket[T]{Conn: conn, Packet: packet}
 }
-
-type EventAcceptedFrontendConnection struct {
-	Name string
-	Conn *comm.Conn
-}

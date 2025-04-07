@@ -27,7 +27,7 @@ func NewStream[T any](source <-chan T) *Stream[T] {
 	return NewStreamWithLocker(source, &sync.Mutex{})
 }
 
-func NewStreamWithSliceWithLocker[T any](slice []T, locker sync.Locker) *Stream[container.Wrapper[T]] {
+func NewStreamFromSliceWithLocker[T any](slice []T, locker sync.Locker) *Stream[container.Wrapper[T]] {
 	source := make(chan container.Wrapper[T])
 	s := NewStreamWithLocker(source, locker)
 	go func() {
@@ -39,11 +39,11 @@ func NewStreamWithSliceWithLocker[T any](slice []T, locker sync.Locker) *Stream[
 	return s
 }
 
-func NewStreamWithSlice[T any](slice []T) *Stream[container.Wrapper[T]] {
-	return NewStreamWithSliceWithLocker(slice, &sync.Mutex{})
+func NewStreamFromSlice[T any](slice []T) *Stream[container.Wrapper[T]] {
+	return NewStreamFromSliceWithLocker(slice, &sync.Mutex{})
 }
 
-func NewStreamWithMapWithLocker[T1 comparable, T2 any](m map[T1]T2, locker sync.Locker) *Stream[container.Entry[T1, T2]] {
+func NewStreamFromMapWithLocker[T1 comparable, T2 any](m map[T1]T2, locker sync.Locker) *Stream[container.Entry[T1, T2]] {
 	source := make(chan container.Entry[T1, T2])
 	s := NewStreamWithLocker(source, locker)
 	go func() {
@@ -56,7 +56,7 @@ func NewStreamWithMapWithLocker[T1 comparable, T2 any](m map[T1]T2, locker sync.
 }
 
 func NewStreamWithMap[T1 comparable, T2 any](m map[T1]T2) *Stream[container.Entry[T1, T2]] {
-	return NewStreamWithMapWithLocker(m, &sync.Mutex{})
+	return NewStreamFromMapWithLocker(m, &sync.Mutex{})
 }
 
 func (s *Stream[T]) Filter(predicate func(T) bool) *Stream[T] {

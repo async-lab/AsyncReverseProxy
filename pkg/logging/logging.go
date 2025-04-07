@@ -30,11 +30,7 @@ func (f *GeneralFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		showPath = "unknown_file"
 		line = 0
 	} else {
-		for i := 0; i < 2; i++ {
-			showPath = file[strings.LastIndex(file, "/"):] + showPath
-			file = file[:strings.LastIndex(file, "/")]
-		}
-		showPath = "..." + showPath
+		showPath = file
 	}
 
 	if f.IsVerbose {

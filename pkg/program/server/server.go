@@ -3,31 +3,41 @@ package server
 import (
 	"context"
 
-	"club.asynclab/asrp/pkg/base/structure"
+	"club.asynclab/asrp/pkg/arch"
+	"club.asynclab/asrp/pkg/arch/ushers"
+	"club.asynclab/asrp/pkg/base/channel"
+	"club.asynclab/asrp/pkg/base/concurrent"
 	"club.asynclab/asrp/pkg/config"
 	"club.asynclab/asrp/pkg/logging"
 	"club.asynclab/asrp/pkg/program"
-	"club.asynclab/asrp/pkg/program/general"
 	"club.asynclab/asrp/pkg/program/session"
 )
 
 var logger = logging.GetLogger()
 
 type Server struct {
-	program.MetaProgram
-	Config   *config.ConfigServer
-	Sessions *structure.SyncMap[string, *session.ServerSession]
+	*program.MetaProgram
+	Config   config.ConfigServer
+	Sessions *concurrent.ConcurrentMap[string, *session.ServerSession]
+	Usher    arch.IUsher
 }
 
-func NewServer(ctx context.Context, config *config.ConfigServer) *Server {
-	server := &Server{
-		MetaProgram: *program.NewMetaProgram(ctx),
-		Config:      config,
-		Sessions:    structure.NewSyncMap[string, *session.ServerSession](),
+func NewServer(parentCtx context.Context, config config.ConfigServer) (*Server, error) {
+	meta := program.NewMetaProgram(parentCtx)
+	if config.Server == nil {
+		panic("Config is nil")
 	}
-	general.AddGeneralEventHandler(server.EventBus)
-	AddServerEventHandler(server.EventBus)
-	return server
+	usher, err := ushers.NewUsherTLS(meta.Ctx, config.Server.Listen, config.Server.Token)
+	if err != nil {
+		return nil, err
+	}
+	server := &Server{
+		MetaProgram: meta,
+		Config:      config,
+		Sessions:    concurrent.NewSyncMap[string, *session.ServerSession](),
+		Usher:       usher,
+	}
+	return server, nil
 }
 
 func GetServer() *Server {
@@ -39,14 +49,44 @@ func GetServer() *Server {
 }
 
 func (server *Server) CheckConfig() bool {
-	if server.Config == nil {
-		logger.Error("Config is nil")
-		return false
-	}
 	if server.Config.Server == nil {
 		logger.Error("Server config is nil")
 		return false
 	}
+	if server.Config.Server.Listen == "" {
+		logger.Error("Server listen address is empty")
+		return false
+	}
+	return true
+}
+
+func (server *Server) handleForwarder(fwv *arch.ForwarderWithValues) bool {
+	s, ok := server.Sessions.Load(fwv.Name)
+	if !ok {
+		_s, err := session.NewServerSession(server.Ctx, fwv.FrontendAddr)
+		if err != nil {
+			logger.Error("Error creating session: ", err)
+			fwv.Close()
+			return true
+		}
+		server.Sessions.Store(fwv.Name, _s)
+		s = _s
+	}
+	uuid := s.GetDispatcher().AddForwarder(fwv)
+	logger.Info("["+fwv.Name+"] (", s.GetDispatcher().Len(), ") established")
+	go func() {
+		<-fwv.GetCtx().Done()
+		s.GetDispatcher().RemoveForwarder(uuid)
+
+		remaining := s.GetDispatcher().Len()
+
+		logger.Info("["+fwv.Name+"] (", remaining, ") closed")
+
+		if remaining == 0 {
+			server.Sessions.Delete(fwv.Name)
+			s.Close()
+		}
+	}()
 	return true
 }
 
@@ -55,9 +95,7 @@ func (server *Server) Run() {
 		return
 	}
 
-	logger.Info("Server starting...")
+	logger.Info("Server is running on ", server.Config.Server.Listen)
 
-	server.Listen()
-
-	<-server.Ctx.Done()
+	channel.ConsumeWithCtx(server.Ctx, server.Usher.GetChanSendForwarder(), server.handleForwarder)
 }

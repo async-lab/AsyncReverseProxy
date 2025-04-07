@@ -6,29 +6,29 @@ import (
 	"github.com/google/uuid"
 )
 
-type IndexMap[T comparable] struct {
+type IndexMap[T any] struct {
 	m map[string]T
 }
 
-func NewIndexMap[T comparable]() *IndexMap[T] {
+func NewIndexMap[T any]() *IndexMap[T] {
 	return &IndexMap[T]{
 		m: make(map[string]T),
 	}
 }
 
-func (self *IndexMap[T]) Load(key string) (value T, ok bool) {
-	value, ok = self.m[key]
+func (im *IndexMap[T]) Load(key string) (value T, ok bool) {
+	value, ok = im.m[key]
 	return
 }
 
-func (self *IndexMap[T]) Store(value T) (index string) {
+func (im *IndexMap[T]) Store(value T) (index string) {
 	for {
 		i := uuid.NewString()
-		_, ok := self.m[i]
+		_, ok := im.m[i]
 		if ok {
 			continue
 		} else {
-			self.m[i] = value
+			im.m[i] = value
 			index = i
 			break
 		}
@@ -36,17 +36,17 @@ func (self *IndexMap[T]) Store(value T) (index string) {
 	return
 }
 
-func (self *IndexMap[T]) LoadOrStore(key string, value T) (actual T, loaded bool) {
-	actual, loaded = self.m[key]
+func (im *IndexMap[T]) LoadOrStore(key string, value T) (actual T, loaded bool) {
+	actual, loaded = im.m[key]
 	if !loaded {
-		self.m[key] = value
+		im.m[key] = value
 		actual = value
 	}
 	return
 }
 
-func (self *IndexMap[T]) Delete(key string) {
-	delete(self.m, key)
+func (im *IndexMap[T]) Delete(key string) {
+	delete(im.m, key)
 }
 
 func (s *IndexMap[T]) LoadAndDelete(key string) (value T, loaded bool) {
@@ -57,31 +57,32 @@ func (s *IndexMap[T]) LoadAndDelete(key string) (value T, loaded bool) {
 	return
 }
 
-func (self *IndexMap[T]) CompareAndDelete(key string, value T) (deleted bool) {
-	if v, ok := self.m[key]; ok && v == value {
-		delete(self.m, key)
-		return true
-	}
-	return false
-}
+// func (im *IndexMap[T]) CompareAndDelete(key string, value T) (deleted bool) {
+// 	if v, ok := im.m[key]; ok && v == value {
+// 		delete(im.m, key)
+// 		return true
+// 	}
+// 	return false
+// }
 
-func (self *IndexMap[T]) Swap(key string, value T) (previous T, loaded bool) {
-	previous, loaded = self.m[key]
-	self.m[key] = value
+func (im *IndexMap[T]) Swap(key string, value T) (previous T, loaded bool) {
+	previous, loaded = im.m[key]
+	im.m[key] = value
 	return
 }
-func (self *IndexMap[T]) CompareAndSwap(key string, old, new T) (swapped bool) {
-	if v, ok := self.m[key]; ok && v == old {
-		self.m[key] = new
-		return true
-	}
-	return false
+
+// func (im *IndexMap[T]) CompareAndSwap(key string, old, new T) (swapped bool) {
+// 	if v, ok := im.m[key]; ok && v == old {
+// 		im.m[key] = new
+// 		return true
+// 	}
+// 	return false
+// }
+
+func (im *IndexMap[T]) Len() int {
+	return len(im.m)
 }
 
-func (self *IndexMap[T]) Len() int {
-	return len(self.m)
-}
-
-func (self *IndexMap[T]) Stream() *hof.Stream[container.Entry[string, T]] {
-	return hof.NewStreamWithMap(self.m)
+func (im *IndexMap[T]) Stream() *hof.Stream[container.Entry[string, T]] {
+	return hof.NewStreamWithMap(im.m)
 }

@@ -3,105 +3,51 @@ package session
 import (
 	"context"
 
-	"club.asynclab/asrp/pkg/comm"
-	"club.asynclab/asrp/pkg/packet"
-	"club.asynclab/asrp/pkg/program"
-	"github.com/google/uuid"
+	"club.asynclab/asrp/pkg/arch"
+	"club.asynclab/asrp/pkg/arch/acceptors"
+	"club.asynclab/asrp/pkg/arch/dispatchers"
+	"club.asynclab/asrp/pkg/base/channel"
 )
 
 type ServerSession struct {
-	*MetaSessionForConnection
-	Listener *comm.Listener
-	Lb       *LoadBalancer
+	ctx        context.Context
+	ctxCancel  context.CancelFunc
+	dispatcher arch.IDispatcher
+	acceptor   arch.IAcceptor
 }
 
-func NewServerSession(name string, listener *comm.Listener) *ServerSession {
-	return &ServerSession{
-		MetaSessionForConnection: NewMetaSessionForConnection(name),
-		Listener:                 listener,
-		Lb:                       NewLoadBalancer(),
+func NewServerSession(parentCtx context.Context, frontendAddr string) (*ServerSession, error) {
+	ctx, cancel := context.WithCancel(parentCtx)
+	acceptor, err := acceptors.NewAcceptorTCP(ctx, frontendAddr)
+	if err != nil {
+		cancel()
+		return nil, err
 	}
+	s := &ServerSession{
+		ctx:        ctx,
+		ctxCancel:  cancel,
+		dispatcher: dispatchers.NewDispatcher(ctx),
+		acceptor:   acceptor,
+	}
+
+	go channel.ConsumeWithCtx(s.ctx, s.acceptor.GetChanSendPacket(), s.dispatcher.HandlePacket)
+	go channel.ConsumeWithCtx(s.ctx, s.dispatcher.GetChanSendPacket(), s.acceptor.HandlePacket)
+
+	return s, nil
 }
 
-func (s *ServerSession) AddProxyConn(proxyConn *comm.Conn, priority int, weight int) context.Context {
-	uuid := s.Lb.AddConn(proxyConn, priority, weight)
-	logger.Info("[", s.Name, "] (", s.Lb.Len(), ") connection established")
-
-	closeCtx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		defer func() {
-			s.Lb.RemoveConn(uuid)
-			if s.Lb.Len() == 0 {
-				s.Listener.Close()
-				logger.Info("[", s.Name, "] (", s.Lb.Len(), ") connection closed, all connections closed")
-				cancel()
-			} else {
-				logger.Info("[", s.Name, "] (", s.Lb.Len(), ") connection closed")
-			}
-		}()
-		<-proxyConn.Ctx.Done()
-	}()
-
-	return closeCtx
+func (s *ServerSession) Close() {
+	s.ctxCancel()
 }
 
-func (s *ServerSession) Start() {
-	go func() {
-		for {
-			conn, err := s.Listener.Accept()
-			if err != nil {
-				if s.Listener.Ctx.Err() != nil {
-					return
-				}
-				continue
-			}
-			go s.handleAcceptedFrontendConnection(conn)
-		}
-	}()
+func (s *ServerSession) GetCtx() context.Context {
+	return s.ctx
 }
 
-func (s *ServerSession) handleAcceptedFrontendConnection(frontConn *comm.Conn) {
-	defer frontConn.Close()
+func (s *ServerSession) GetDispatcher() arch.IDispatcher {
+	return s.dispatcher
+}
 
-	_, proxyConn, ok := s.Lb.Next()
-	if !ok {
-		return
-	}
-
-	connUuid := uuid.NewString()
-
-	if !program.Program.SendPacket(proxyConn, &packet.PacketNewEndSideConnection{Name: s.Name, Uuid: connUuid}) {
-		return
-	}
-
-	s.EndConns.Store(connUuid, frontConn)
-	defer s.EndConns.Delete(connUuid)
-	defer comm.SendPacket(proxyConn, &packet.PacketEndSideConnectionClosed{Name: s.Name, Uuid: connUuid})
-	defer logger.Debug("[", s.Name, "] (", s.Lb.Len(), ") end connection closed")
-
-	logger.Debug("[", s.Name, "] (", s.Lb.Len(), ") end connection established")
-
-	go func() {
-		defer frontConn.Close()
-		<-proxyConn.Ctx.Done()
-	}()
-
-	for {
-		bytes, err := comm.ReadForBytes(frontConn)
-		if err != nil {
-			if frontConn.Ctx.Err() != nil {
-				return
-			}
-			continue
-		}
-
-		if !program.Program.SendPacket(proxyConn, &packet.PacketProxyData{
-			Name: s.Name,
-			Uuid: connUuid,
-			Data: bytes,
-		}) {
-			return
-		}
-	}
+func (s *ServerSession) GetAcceptor() arch.IAcceptor {
+	return s.acceptor
 }

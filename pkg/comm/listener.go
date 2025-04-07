@@ -11,7 +11,31 @@ type Listener struct {
 	net.Listener
 	Ctx       context.Context
 	CtxCancel context.CancelFunc
-	Closed    bool
+	closed    bool
+}
+
+func NewListenerWithCtx(ctx context.Context, cancel context.CancelFunc, listener net.Listener) *Listener {
+	if ctx == nil {
+		panic("ctx is nil")
+	}
+	if cancel == nil {
+		panic("cancel is nil")
+	}
+	if listener == nil {
+		panic("listener is nil")
+	}
+
+	ret := &Listener{
+		Listener:  listener,
+		Ctx:       ctx,
+		CtxCancel: cancel,
+		closed:    false,
+	}
+	go func() {
+		defer ret.Close()
+		<-ctx.Done()
+	}()
+	return ret
 }
 
 func NewListenerWithParentCtx(parentCtx context.Context, listener net.Listener) *Listener {
@@ -20,22 +44,7 @@ func NewListenerWithParentCtx(parentCtx context.Context, listener net.Listener) 
 	}
 
 	ctx, cancel := context.WithCancel(parentCtx)
-	ret := &Listener{
-		Listener:  listener,
-		Ctx:       ctx,
-		CtxCancel: cancel,
-		Closed:    false,
-	}
-	go func() {
-		defer ret.Close()
-		select {
-		case <-ret.Ctx.Done():
-			break
-		case <-ctx.Done():
-			break
-		}
-	}()
-	return ret
+	return NewListenerWithCtx(ctx, cancel, listener)
 }
 
 func NewListener(listener net.Listener) *Listener {
@@ -44,7 +53,7 @@ func NewListener(listener net.Listener) *Listener {
 
 func (l *Listener) Accept() (*Conn, error) {
 	c, err := l.Listener.Accept()
-	if lang.IsNetClose(err) {
+	if lang.IsNetLost(err) {
 		l.Close()
 	}
 	if c == nil {
@@ -54,9 +63,11 @@ func (l *Listener) Accept() (*Conn, error) {
 }
 
 func (l *Listener) Close() error {
-	defer func() {
-		l.CtxCancel()
-		l.Closed = true
-	}()
+	l.CtxCancel()
+	l.closed = true
 	return l.Listener.Close()
+}
+
+func (c *Listener) IsClosed() bool {
+	return c.closed
 }
