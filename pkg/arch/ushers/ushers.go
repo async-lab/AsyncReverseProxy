@@ -75,16 +75,15 @@ func (usher *Usher[T]) handleConnection(conn *comm.Conn) {
 	}
 
 	usher.senderForwarder.Push(&arch.ForwarderWithValues{
-		IForwarder:   f,
-		Name:         p.Name,
-		FrontendAddr: p.FrontendAddr,
-		Priority:     int(p.Priority),
-		Weight:       int(p.Weight),
+		IForwarder: f,
+		InitPacket: p,
 	})
 }
 
-func (usher *Usher[T]) init() {
-	go pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
+// -------------------------------------------
+
+func (usher *Usher[T]) routineRead() {
+	pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
 		WithCtx(usher.GetCtx()).
 		WithGoroutine(func(ch chan *comm.Conn) {
 			for {
@@ -101,4 +100,8 @@ func (usher *Usher[T]) init() {
 		}).
 		WithChannelHandler(func(conn *comm.Conn) { go usher.handleConnection(conn) }).
 		Run()
+}
+
+func (usher *Usher[T]) init() {
+	go usher.routineRead()
 }

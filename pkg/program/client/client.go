@@ -17,8 +17,9 @@ var logger = logging.GetLogger()
 
 type Client struct {
 	program.MetaProgram
-	Config   config.ConfigClient
-	Sessions *concurrent.ConcurrentMap[string, *session.ClientSession]
+	Config    config.ConfigClient
+	Sessions  *concurrent.ConcurrentMap[string, *session.ClientSession]
+	Connector arch.IConnector
 }
 
 func NewClient(ctx context.Context, config config.ConfigClient) *Client {
@@ -48,6 +49,11 @@ func (client *Client) CheckConfig() bool {
 		return false
 	}
 	for _, proxy := range client.Config.Proxies {
+		if proxy.Proto == "" {
+			logger.Error("[", proxy.Name, "]'s Proto is empty")
+			return false
+		}
+
 		if len(proxy.Remotes) == 0 {
 			logger.Error("[", proxy.Name, "]'s Remotes is empty")
 			return false
@@ -80,9 +86,10 @@ func (client *Client) StartProxySession(remoteConfig config.ConfigItemRemote, pr
 	if err != nil {
 		return
 	}
+	client.Connector = connector
 
-	channel.ConsumeWithCtx(client.Ctx, connector.GetChanSendForwarder(), func(f arch.IForwarder) bool {
-		session, err := session.NewClientSession(client.Ctx, f, proxyConfig.Backend)
+	channel.ConsumeWithCtx(client.Ctx, client.Connector.GetChanSendForwarder(), func(f arch.IForwarder) bool {
+		session, err := session.NewClientSession(client.Ctx, f, proxyConfig)
 		if err != nil {
 			return false
 		}

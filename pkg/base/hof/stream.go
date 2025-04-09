@@ -55,8 +55,24 @@ func NewStreamFromMapWithLocker[T1 comparable, T2 any](m map[T1]T2, locker sync.
 	return s
 }
 
+func NewStreamFromMapKeyWithLocker[T1 comparable, T2 any](m map[T1]T2, locker sync.Locker) *Stream[T1] {
+	source := make(chan T1)
+	s := NewStreamWithLocker(source, locker)
+	go func() {
+		defer close(source)
+		for key := range m {
+			source <- key
+		}
+	}()
+	return s
+}
+
 func NewStreamWithMap[T1 comparable, T2 any](m map[T1]T2) *Stream[container.Entry[T1, T2]] {
 	return NewStreamFromMapWithLocker(m, &sync.Mutex{})
+}
+
+func NewStreamWithMapKey[T1 comparable, T2 any](m map[T1]T2) *Stream[T1] {
+	return NewStreamFromMapKeyWithLocker(m, &sync.Mutex{})
 }
 
 func (s *Stream[T]) Filter(predicate func(T) bool) *Stream[T] {

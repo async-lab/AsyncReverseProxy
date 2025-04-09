@@ -2,10 +2,12 @@ package session
 
 import (
 	"context"
+	"fmt"
 
 	"club.asynclab/asrp/pkg/arch"
 	"club.asynclab/asrp/pkg/arch/dialers"
 	"club.asynclab/asrp/pkg/base/channel"
+	"club.asynclab/asrp/pkg/config"
 )
 
 type ClientSession struct {
@@ -15,9 +17,19 @@ type ClientSession struct {
 	Dialer    arch.IDialer
 }
 
-func NewClientSession(parentCtx context.Context, forwarder arch.IForwarder, backendAddr string) (*ClientSession, error) {
+func NewClientSession(parentCtx context.Context, forwarder arch.IForwarder, proxyConfig config.ConfigItemProxy) (*ClientSession, error) {
 	ctx, cancel := context.WithCancel(parentCtx)
-	dialer, err := dialers.NewDialerTCP(ctx, backendAddr)
+	var dialer arch.IDialer
+	var err error
+	switch proxyConfig.Proto {
+	case "tcp":
+		dialer, err = dialers.NewDialerTCP(ctx, proxyConfig.Backend)
+	case "udp":
+		dialer, err = dialers.NewDialerUDP(ctx, proxyConfig.Backend)
+	default:
+		cancel()
+		return nil, fmt.Errorf("unsupported protocol: %T", proxyConfig.Proto)
+	}
 	if err != nil {
 		cancel()
 		return nil, err

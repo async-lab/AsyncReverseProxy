@@ -17,13 +17,14 @@ var logger = logging.GetLogger()
 
 type Dispatcher struct {
 	concurrent.MetaConcurrentStructure[Dispatcher]
-	ctx          context.Context
-	ctxCancel    context.CancelFunc
-	forwarders   *structure.IndexMap[*arch.ForwarderWithValues]
-	totalWeights map[int]int // priority -> totalWeight
-	currentIndex int
-	senderPacket *channel.SafeSender[packet.IPacket]
-	connsMap     *concurrent.ConcurrentMap[string, string]
+	ctx              context.Context
+	ctxCancel        context.CancelFunc
+	forwarders       *structure.IndexMap[*arch.ForwarderWithValues]
+	totalWeights     map[uint32]uint32 // priority -> totalWeight
+	currentIndex     int
+	senderPacket     *channel.SafeSender[packet.IPacket]
+	connsMap         *concurrent.ConcurrentMap[string, string]                     // conn -> forwarder
+	connsMapBackward *concurrent.ConcurrentMap[string, *structure.HashSet[string]] // forwarder -> conns
 }
 
 func NewDispatcher(parentCtx context.Context) *Dispatcher {
@@ -32,11 +33,12 @@ func NewDispatcher(parentCtx context.Context) *Dispatcher {
 		ctx:                     ctx,
 		ctxCancel:               cancel,
 		forwarders:              structure.NewIndexMap[*arch.ForwarderWithValues](),
-		totalWeights:            make(map[int]int),
+		totalWeights:            make(map[uint32]uint32),
 		currentIndex:            0,
 		MetaConcurrentStructure: *concurrent.NewMetaSyncStructure[Dispatcher](),
 		senderPacket:            channel.NewSafeSenderWithParentCtxAndSize[packet.IPacket](ctx, 16),
 		connsMap:                concurrent.NewSyncMap[string, string](),
+		connsMapBackward:        concurrent.NewSyncMap[string, *structure.HashSet[string]](),
 	}
 
 	return dispatcher
@@ -57,23 +59,12 @@ func (dispatcher *Dispatcher) Close() error {
 
 // ---------------------------------------------------------------------
 
-func (dispatcher *Dispatcher) packetHandlerMiddleware(forwarderUuid string, f func(packet.IPacket) bool) func(packet.IPacket) bool {
-	return func(pkt packet.IPacket) bool {
-		switch pkt := pkt.(type) {
-		case *packet.PacketProxyData:
-			dispatcher.connsMap.LoadOrStore(pkt.Uuid, forwarderUuid)
-		}
-
-		return f(pkt)
-	}
-}
-
 func (dispatcher *Dispatcher) AddForwarder(fwv *arch.ForwarderWithValues) (uuid string) {
 	dispatcher.Lock.Lock()
 	defer dispatcher.Lock.Unlock()
 
 	uuid = dispatcher.forwarders.Store(fwv)
-	dispatcher.totalWeights[fwv.Priority] += fwv.Weight
+	dispatcher.totalWeights[fwv.InitPacket.Priority] += fwv.InitPacket.Weight
 
 	go channel.ConsumeWithCtx(dispatcher.GetCtx(), fwv.GetChanSendPacket(), dispatcher.senderPacket.Push)
 
@@ -88,12 +79,14 @@ func (dispatcher *Dispatcher) RemoveForwarder(uuid string) {
 	if !ok {
 		return
 	}
-	dispatcher.totalWeights[conn.Priority] -= conn.Weight
-	if dispatcher.totalWeights[conn.Priority] == 0 {
-		delete(dispatcher.totalWeights, conn.Priority)
+	dispatcher.totalWeights[conn.InitPacket.Priority] -= conn.InitPacket.Weight
+	if dispatcher.totalWeights[conn.InitPacket.Priority] == 0 {
+		delete(dispatcher.totalWeights, conn.InitPacket.Priority)
 	}
 	dispatcher.forwarders.Delete(uuid)
-	dispatcher.connsMap.Delete(uuid)
+	if conns, ok := dispatcher.connsMapBackward.LoadAndDelete(uuid); ok {
+		conns.Stream().ForEach(func(t string) { dispatcher.connsMap.Delete(t) })
+	}
 }
 
 func (dispatcher *Dispatcher) Next() (uuid string, forwarder arch.IForwarder, ok bool) {
@@ -104,7 +97,7 @@ func (dispatcher *Dispatcher) Next() (uuid string, forwarder arch.IForwarder, ok
 		return
 	}
 
-	totalWeight, _ok := hof.NewStreamWithMap(dispatcher.totalWeights).Max(func(bigger container.Entry[int, int], smaller container.Entry[int, int]) bool {
+	totalWeight, _ok := hof.NewStreamWithMap(dispatcher.totalWeights).Max(func(bigger container.Entry[uint32, uint32], smaller container.Entry[uint32, uint32]) bool {
 		return bigger.GetKey() > smaller.GetKey()
 	})
 
@@ -112,13 +105,13 @@ func (dispatcher *Dispatcher) Next() (uuid string, forwarder arch.IForwarder, ok
 		return
 	}
 
-	dispatcher.currentIndex = (dispatcher.currentIndex + 1) % totalWeight.GetValue()
+	dispatcher.currentIndex = (dispatcher.currentIndex + 1) % int(totalWeight.GetValue())
 	i := dispatcher.currentIndex
 
 	dispatcher.forwarders.Stream().Filter(func(t container.Entry[string, *arch.ForwarderWithValues]) bool {
-		return t.GetValue().Priority == totalWeight.GetKey()
+		return t.GetValue().InitPacket.Priority == totalWeight.GetKey()
 	}).Range(func(t container.Entry[string, *arch.ForwarderWithValues]) bool {
-		i -= t.GetValue().Weight
+		i -= int(t.GetValue().InitPacket.Weight)
 		if i < 0 {
 			uuid, forwarder, ok = t.GetKey(), t.GetValue(), true
 			return false
@@ -152,15 +145,17 @@ func (dispatcher *Dispatcher) HandlePacket(pkt packet.IPacket) bool {
 	switch pkt := pkt.(type) {
 	case packet.IPacketForConn:
 		if uuid, ok := dispatcher.connsMap.Load(pkt.GetUuid()); ok {
-			if v, ok := dispatcher.forwarders.Load(uuid); ok {
-				v.HandlePacket(pkt)
-				return true
+			if forwarder, ok := dispatcher.forwarders.Load(uuid); ok {
+				forwarder.HandlePacket(pkt)
+			}
+		} else {
+			if uuid, forwarder, ok := dispatcher.Next(); ok {
+				actual, _ := dispatcher.connsMap.LoadOrStore(pkt.GetUuid(), uuid)
+				actual2, _ := dispatcher.connsMapBackward.LoadOrStore(actual, structure.NewHashSet[string]())
+				actual2.Store(pkt.GetUuid())
+				forwarder.HandlePacket(pkt)
 			}
 		}
-	}
-
-	if uuid, forwarder, ok := dispatcher.Next(); ok {
-		dispatcher.packetHandlerMiddleware(uuid, forwarder.HandlePacket)(pkt)
 	}
 
 	return true

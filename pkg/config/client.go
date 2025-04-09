@@ -8,6 +8,7 @@ type ConfigItemRemote struct {
 
 type ConfigItemProxy struct {
 	Name     string   `toml:"name"`
+	Proto    string   `toml:"proto"`
 	Remotes  []string `toml:"remotes"`
 	Backend  string   `toml:"backend"`
 	Frontend string   `toml:"frontend"`

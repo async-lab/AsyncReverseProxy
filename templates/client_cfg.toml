@@ -11,6 +11,7 @@ token = "qwhrqwh"
 
 [[proxies]]
 name = "proxy1"
+proto = "tcp"
 remotes = ["server1", "server2"]
 backend = "localhost:80"
 frontend = "localhost:54321"
@@ -19,6 +20,7 @@ weight = 1
 
 [[proxies]]
 name = "proxy2"
+proto = "tcp"
 remotes = ["server1"]
 backend = "localhost:3000"
 frontend = "localhost:54322"

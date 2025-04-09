@@ -13,3 +13,13 @@ func IsNetClose(err error) bool {
 func IsNetLost(err error) bool {
 	return IsNetClose(err) || errors.As(err, new(net.Error))
 }
+
+func IsTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	if ne, ok := err.(net.Error); ok && ne.Timeout() {
+		return true
+	}
+	return false
+}

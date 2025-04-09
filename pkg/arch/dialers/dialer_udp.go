@@ -3,9 +3,7 @@ package dialers
 import (
 	"context"
 	"net"
-	"time"
 
-	"club.asynclab/asrp/pkg/base/network"
 	"club.asynclab/asrp/pkg/comm"
 )
 
@@ -23,5 +21,5 @@ func (impl *DialerImplUDP) Dial(ctx context.Context, addr string) (*comm.Conn, e
 	if err != nil {
 		return nil, err
 	}
-	return comm.NewConnWithParentCtx(ctx, network.NewConnWithTimeout(conn, 60*time.Second, 0)), nil
+	return comm.NewConnWithParentCtx(ctx, conn), nil
 }

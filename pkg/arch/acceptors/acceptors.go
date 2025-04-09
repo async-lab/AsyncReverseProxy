@@ -88,23 +88,27 @@ func (acceptor *Acceptor[T]) HandlePacket(pkt packet.IPacket) bool {
 	return true
 }
 
-func (acceptor *Acceptor[T]) init() {
-	go func() {
-		pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
-			WithCtx(acceptor.GetCtx()).
-			WithGoroutine(func(ch chan *comm.Conn) {
-				for {
-					conn, err := acceptor.listener.Accept()
-					if err != nil {
-						if acceptor.GetCtx().Err() != nil {
-							return
-						}
-						continue
+// ----------------------------------------------
+
+func (acceptor *Acceptor[T]) routineRead() {
+	pattern.NewConfigSelectContextAndChannel[*comm.Conn]().
+		WithCtx(acceptor.GetCtx()).
+		WithGoroutine(func(ch chan *comm.Conn) {
+			for {
+				conn, err := acceptor.listener.Accept()
+				if err != nil {
+					if acceptor.GetCtx().Err() != nil {
+						return
 					}
-					ch <- conn
+					continue
 				}
-			}).
-			WithChannelHandler(func(conn *comm.Conn) { go acceptor.handleConnection(conn) }).
-			Run()
-	}()
+				ch <- conn
+			}
+		}).
+		WithChannelHandler(func(conn *comm.Conn) { go acceptor.handleConnection(conn) }).
+		Run()
+}
+
+func (acceptor *Acceptor[T]) init() {
+	go acceptor.routineRead()
 }

@@ -92,14 +92,14 @@ func (dialer *Dialer[T]) HandlePacket(pkt packet.IPacket) bool {
 		return false
 	}
 
-	switch pkt := pkt.(type) { // TODO dialer失败就发送给dispatcher重分配请求
+	switch pkt := pkt.(type) {
 	case *packet.PacketProxyData:
 		ok := true
 
 		dialer.conns.Compute(func(v *concurrent.ConcurrentIndexMap[*comm.Conn]) {
 			if _, ok := v.Load(pkt.Uuid); !ok {
 				conn, err := dialer.impl.Dial(dialer.ctx, dialer.addr)
-				if err != nil {
+				if err != nil { // TODO dialer失败就发送给dispatcher重分配请求
 					ok = false
 					logger.Error(fmt.Sprintf("Error dialing: %v", err))
 					return

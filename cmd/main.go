@@ -33,11 +33,6 @@ func loadConfig[T config.IConfig](path string) (T, error) {
 	return *cfg, nil
 }
 
-func start(prog program.IProgram) {
-	program.Program = prog
-	prog.Run()
-}
-
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&config.IsVerbose, "verbose", "v", false, "verbose output")
 
@@ -58,7 +53,8 @@ func init() {
 				logger.Error("Error creating server: ", err)
 				return
 			}
-			start(s)
+			program.Program = s
+			s.Run()
 		},
 	})
 
@@ -74,7 +70,9 @@ func init() {
 				logger.Error("Error loading config: ", err)
 				return
 			}
-			start(client.NewClient(ctx, cfg))
+			c := client.NewClient(ctx, cfg)
+			program.Program = c
+			c.Run()
 		},
 	})
 

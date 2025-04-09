@@ -9,6 +9,7 @@ type PacketUnknown struct {
 // 请求一个新的代理
 type PacketProxyNegotiationRequest struct {
 	Name         string
+	Proto        string
 	FrontendAddr string
 	Priority     uint32
 	Weight       uint32

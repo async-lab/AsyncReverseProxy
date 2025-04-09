@@ -2,11 +2,13 @@ package session
 
 import (
 	"context"
+	"fmt"
 
 	"club.asynclab/asrp/pkg/arch"
 	"club.asynclab/asrp/pkg/arch/acceptors"
 	"club.asynclab/asrp/pkg/arch/dispatchers"
 	"club.asynclab/asrp/pkg/base/channel"
+	"club.asynclab/asrp/pkg/packet"
 )
 
 type ServerSession struct {
@@ -16,9 +18,19 @@ type ServerSession struct {
 	acceptor   arch.IAcceptor
 }
 
-func NewServerSession(parentCtx context.Context, frontendAddr string) (*ServerSession, error) {
+func NewServerSession(parentCtx context.Context, initPacket *packet.PacketProxyNegotiationRequest) (*ServerSession, error) {
 	ctx, cancel := context.WithCancel(parentCtx)
-	acceptor, err := acceptors.NewAcceptorTCP(ctx, frontendAddr)
+	var acceptor arch.IAcceptor
+	var err error
+	switch initPacket.Proto {
+	case "tcp":
+		acceptor, err = acceptors.NewAcceptorTCP(ctx, initPacket.FrontendAddr)
+	case "udp":
+		acceptor, err = acceptors.NewAcceptorUDP(ctx, initPacket.FrontendAddr)
+	default:
+		cancel()
+		return nil, fmt.Errorf("unsupported protocol: %T", initPacket.Proto)
+	}
 	if err != nil {
 		cancel()
 		return nil, err

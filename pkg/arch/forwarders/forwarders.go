@@ -22,7 +22,7 @@ func NewForwarder(conn *comm.Conn) *Forwarder {
 	forwarder := &Forwarder{
 		Tip:          "[Common Forwarder]: ",
 		conn:         conn,
-		senderPacket: channel.NewSafeSenderWithSize[packet.IPacket](16),
+		senderPacket: channel.NewSafeSenderWithParentCtxAndSize[packet.IPacket](conn.GetCtx(), 16),
 	}
 
 	forwarder.init()
@@ -69,20 +69,22 @@ func (forwarder *Forwarder) GetChanSendPacket() <-chan packet.IPacket {
 
 // ---------------------------------------------------------------------
 
-func (forwarder *Forwarder) init() {
-	go func() {
-		pattern.NewConfigSelectContextAndChannel[packet.IPacket]().
-			WithCtx(forwarder.GetCtx()).
-			WithGoroutine(func(ch chan packet.IPacket) {
-				for {
-					pkt := forwarder.receivePacket()
-					if pkt == nil {
-						return
-					}
-					ch <- pkt
+func (forwarder *Forwarder) routineRead() {
+	pattern.NewConfigSelectContextAndChannel[packet.IPacket]().
+		WithCtx(forwarder.GetCtx()).
+		WithGoroutine(func(ch chan packet.IPacket) {
+			for {
+				pkt := forwarder.receivePacket()
+				if pkt == nil {
+					return
 				}
-			}).
-			WithChannelHandler(func(pkt packet.IPacket) { forwarder.senderPacket.Push(pkt) }).
-			Run()
-	}()
+				ch <- pkt
+			}
+		}).
+		WithChannelHandler(func(pkt packet.IPacket) { forwarder.senderPacket.Push(pkt) }).
+		Run()
+}
+
+func (forwarder *Forwarder) init() {
+	go forwarder.routineRead()
 }

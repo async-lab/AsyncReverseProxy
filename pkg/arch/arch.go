@@ -52,8 +52,5 @@ type IAcceptor interface {
 
 type ForwarderWithValues struct {
 	IForwarder
-	Name         string
-	FrontendAddr string
-	Priority     int
-	Weight       int
+	InitPacket *packet.PacketProxyNegotiationRequest
 }

@@ -73,6 +73,7 @@ func (connector *Connector[T]) initConnection(conn *comm.Conn) error {
 
 	r := &packet.PacketProxyNegotiationRequest{
 		Name:         connector.proxyConfig.Name,
+		Proto:        connector.proxyConfig.Proto,
 		FrontendAddr: connector.proxyConfig.Frontend,
 		Token:        connector.remoteConfig.Token,
 		Priority:     connector.proxyConfig.Priority,

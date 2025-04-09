@@ -61,29 +61,29 @@ func (server *Server) CheckConfig() bool {
 }
 
 func (server *Server) handleForwarder(fwv *arch.ForwarderWithValues) bool {
-	s, ok := server.Sessions.Load(fwv.Name)
+	s, ok := server.Sessions.Load(fwv.InitPacket.Name)
 	if !ok {
-		_s, err := session.NewServerSession(server.Ctx, fwv.FrontendAddr)
+		_s, err := session.NewServerSession(server.Ctx, fwv.InitPacket)
 		if err != nil {
 			logger.Error("Error creating session: ", err)
 			fwv.Close()
 			return true
 		}
-		server.Sessions.Store(fwv.Name, _s)
+		server.Sessions.Store(fwv.InitPacket.Name, _s)
 		s = _s
 	}
 	uuid := s.GetDispatcher().AddForwarder(fwv)
-	logger.Info("["+fwv.Name+"] (", s.GetDispatcher().Len(), ") established")
+	logger.Info("["+fwv.InitPacket.Name+"] (", s.GetDispatcher().Len(), ") established")
 	go func() {
 		<-fwv.GetCtx().Done()
 		s.GetDispatcher().RemoveForwarder(uuid)
 
 		remaining := s.GetDispatcher().Len()
 
-		logger.Info("["+fwv.Name+"] (", remaining, ") closed")
+		logger.Info("["+fwv.InitPacket.Name+"] (", remaining, ") closed")
 
 		if remaining == 0 {
-			server.Sessions.Delete(fwv.Name)
+			server.Sessions.Delete(fwv.InitPacket.Name)
 			s.Close()
 		}
 	}()

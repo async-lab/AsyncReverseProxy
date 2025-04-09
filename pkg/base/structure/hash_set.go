@@ -1,5 +1,7 @@
 package structure
 
+import "club.asynclab/asrp/pkg/base/hof"
+
 type HashSet[T comparable] struct {
 	m map[T]struct{}
 }
@@ -29,4 +31,8 @@ func (hs *HashSet[T]) Len() int {
 
 func (hs *HashSet[T]) Empty() {
 	hs.m = make(map[T]struct{})
+}
+
+func (hs *HashSet[T]) Stream() *hof.Stream[T] {
+	return hof.NewStreamWithMapKey(hs.m)
 }

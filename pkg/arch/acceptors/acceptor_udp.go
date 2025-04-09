@@ -2,13 +2,13 @@ package acceptors
 
 import (
 	"context"
-	"net"
 
+	"club.asynclab/asrp/pkg/base/network"
 	"club.asynclab/asrp/pkg/comm"
 )
 
 func NewAcceptorUDP(parentCtx context.Context, addr string) (*Acceptor[comm.UDP], error) {
-	listener, err := net.Listen("udp", addr) // TODO
+	listener, err := network.NewUDPListener(addr)
 	if err != nil {
 		return nil, err
 	}
