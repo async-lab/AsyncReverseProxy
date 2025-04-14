@@ -17,9 +17,8 @@ import (
 var logger = logging.GetLogger()
 
 var udpListenerBufSize uint64 = 10 * 1024
-var udpListenerBufPool = concurrent.NewPool(func() *[]byte {
-	buf := make([]byte, udpListenerBufSize)
-	return &buf
+var udpListenerBufPool = concurrent.NewPool(func() []byte {
+	return make([]byte, udpListenerBufSize)
 })
 
 type udpListenerVirtualConn struct {
@@ -175,9 +174,8 @@ func (ul *UDPListener) Close() error {
 }
 
 func (ul *UDPListener) dispatch() {
-	bufPtr := udpListenerBufPool.Get()
-	defer udpListenerBufPool.Put(bufPtr)
-	buf := *bufPtr
+	buf := udpListenerBufPool.Get()
+	defer udpListenerBufPool.Put(buf)
 
 	for {
 		n, addr, err := ul.conn.ReadFromUDP(buf)
