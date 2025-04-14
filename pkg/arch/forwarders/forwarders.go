@@ -40,17 +40,6 @@ func (forwarder *Forwarder) HandlePacket(p packet.IPacket) bool {
 	return true
 }
 
-func (forwarder *Forwarder) receivePacket() packet.IPacket {
-	r, err := comm.ReceivePacket(forwarder.conn)
-	if err != nil {
-		if forwarder.GetCtx().Err() != nil {
-			return nil
-		}
-		r = &packet.PacketUnknown{Err: err}
-	}
-	return r
-}
-
 func (forwarder *Forwarder) GetCtx() context.Context {
 	return forwarder.conn.GetCtx()
 }
@@ -68,6 +57,17 @@ func (forwarder *Forwarder) GetChanSendPacket() <-chan packet.IPacket {
 }
 
 // ---------------------------------------------------------------------
+
+func (forwarder *Forwarder) receivePacket() packet.IPacket {
+	r, err := comm.ReceivePacket(forwarder.conn)
+	if err != nil {
+		if forwarder.GetCtx().Err() != nil {
+			return nil
+		}
+		r = &packet.PacketUnknown{Err: err}
+	}
+	return r
+}
 
 func (forwarder *Forwarder) routineRead() {
 	pattern.NewConfigSelectContextAndChannel[packet.IPacket]().

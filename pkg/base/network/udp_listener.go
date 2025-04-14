@@ -16,7 +16,7 @@ import (
 
 var logger = logging.GetLogger()
 
-var udpListenerBufSize uint32 = 10 * 1024
+var udpListenerBufSize uint64 = 10 * 1024
 var udpListenerBufPool = concurrent.NewPool(func() *[]byte {
 	buf := make([]byte, udpListenerBufSize)
 	return &buf
@@ -218,7 +218,7 @@ func (ul *UDPListener) dispatch() {
 			continue
 		}
 
-		data := make([]byte, n)
+		data := make([]byte, n) //TODO 这里可以用pool
 		copy(data, buf[:n])
 		ok := c.receiver.TryPush(data)
 		if !ok {

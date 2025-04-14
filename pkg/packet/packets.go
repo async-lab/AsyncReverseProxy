@@ -11,8 +11,8 @@ type PacketProxyNegotiationRequest struct {
 	Name         string
 	Proto        string
 	FrontendAddr string
-	Priority     uint32
-	Weight       uint32
+	Priority     uint64
+	Weight       uint64
 	Token        string
 }
 

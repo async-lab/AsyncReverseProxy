@@ -20,7 +20,7 @@ type Dispatcher struct {
 	ctx              context.Context
 	ctxCancel        context.CancelFunc
 	forwarders       *structure.IndexMap[*arch.ForwarderWithValues]
-	totalWeights     map[uint32]uint32 // priority -> totalWeight
+	totalWeights     map[uint64]uint64 // priority -> totalWeight
 	currentIndex     int
 	senderPacket     *channel.SafeSender[packet.IPacket]
 	connsMap         *concurrent.ConcurrentMap[string, string]                     // conn -> forwarder
@@ -33,7 +33,7 @@ func NewDispatcher(parentCtx context.Context) *Dispatcher {
 		ctx:                     ctx,
 		ctxCancel:               cancel,
 		forwarders:              structure.NewIndexMap[*arch.ForwarderWithValues](),
-		totalWeights:            make(map[uint32]uint32),
+		totalWeights:            make(map[uint64]uint64),
 		currentIndex:            0,
 		MetaConcurrentStructure: *concurrent.NewMetaSyncStructure[Dispatcher](),
 		senderPacket:            channel.NewSafeSenderWithParentCtxAndSize[packet.IPacket](ctx, 16),
@@ -97,7 +97,7 @@ func (dispatcher *Dispatcher) Next() (uuid string, forwarder arch.IForwarder, ok
 		return
 	}
 
-	totalWeight, _ok := hof.NewStreamWithMap(dispatcher.totalWeights).Max(func(bigger container.Entry[uint32, uint32], smaller container.Entry[uint32, uint32]) bool {
+	totalWeight, _ok := hof.NewStreamWithMap(dispatcher.totalWeights).Max(func(bigger container.Entry[uint64, uint64], smaller container.Entry[uint64, uint64]) bool {
 		return bigger.GetKey() > smaller.GetKey()
 	})
 

@@ -10,8 +10,8 @@ import (
 
 // var logger = logging.GetLogger()
 
-var commDataSize uint32 = 128 * 1024
-var commBufSize uint32 = 4 + commDataSize
+var commDataSize uint64 = 64 * 1024
+var commBufSize uint64 = 8 + 1024 + commDataSize
 
 var commBufPool = concurrent.NewPool(func() *[]byte {
 	buf := make([]byte, commBufSize)
@@ -28,36 +28,36 @@ func SendPacket(dst io.Writer, p packet.IPacket) (int, error) {
 		return 0, err
 	}
 
-	bufPtr := commBufPool.Get()
-	defer commBufPool.Put(bufPtr)
-	buf := *bufPtr
-
-	length := uint32(len(data))
+	length := uint64(len(data))
 	if length > commBufSize {
 		return 0, io.ErrShortBuffer
 	}
 
-	buf = buf[:4+length]
-	binary.BigEndian.PutUint32(buf[:4], length)
-	copy(buf[4:], data)
-	return dst.Write(buf)
-}
-
-func ReceivePacket(src io.Reader) (packet.IPacket, error) {
 	bufPtr := commBufPool.Get()
 	defer commBufPool.Put(bufPtr)
 	buf := *bufPtr
 
-	buf = buf[:4]
-	_, err := io.ReadFull(src, buf)
+	buf = buf[:8+length]
+	binary.BigEndian.PutUint64(buf[:8], length)
+	copy(buf[8:], data)
+	return dst.Write(buf)
+}
+
+func ReceivePacket(src io.Reader) (packet.IPacket, error) {
+	lenBuf := make([]byte, 8)
+	_, err := io.ReadFull(src, lenBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	length := binary.BigEndian.Uint32(buf)
+	length := binary.BigEndian.Uint64(lenBuf)
 	if length > commBufSize {
 		return nil, io.ErrShortBuffer
 	}
+
+	bufPtr := commBufPool.Get()
+	defer commBufPool.Put(bufPtr)
+	buf := *bufPtr
 
 	buf = buf[:length]
 	n, err := io.ReadFull(src, buf)
